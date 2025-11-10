@@ -7,7 +7,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 Crypto Price Forecaster is a cryptocurrency data collection and preprocessing system designed for machine learning and technical analysis. The project collects historical OHLCV (Open, High, Low, Close, Volume) data and market cap data for major cryptocurrencies from multiple API sources.
 
 **Primary focus**: Historical data collection for BTC/ETH with multiple timeframes (H4, Daily)
-**Data sources**: Binance API (OHLCV), CoinMarketCap API (market cap), CoinMetrics API (network activity)
+**Data sources**: Binance API (OHLCV), CoinMarketCap API (market cap), CoinMetrics API (network activity), Blockchain.info API (mining metrics)
 **Architecture**: Modular, config-driven design with organized data storage
 
 ## Key Architecture
@@ -38,6 +38,11 @@ Three main data collectors with no confirmation prompts (auto-start):
    - Collects Active Addresses and Transaction Count
    - Saves to `data/raw/networkactivity/{coin}_networkactivity.csv`
 
+4. **Security and Mining Collector** (`data-collection/4_secnmining-d1.py`):
+   - Fetches daily mining metrics from Blockchain.info for BTC
+   - Collects Hash Rate, Mining Difficulty, and Miner Revenue
+   - Saves to `data/raw/secnmining/BTC_mining_d1.csv`
+
 ### Data Structure
 
 **OHLCV Data Format** (`data/raw/ohlcv/`):
@@ -54,6 +59,11 @@ Three main data collectors with no confirmation prompts (auto-start):
 - Timestamp format: pandas datetime
 - Features: Daily on-chain network metrics for blockchain analysis
 
+**Mining Data Format** (`data/raw/secnmining/`):
+- Columns: `timestamp, hash_rate_ths, mining_difficulty, miner_revenue_usd`
+- Timestamp format: pandas datetime
+- Features: Daily mining security metrics for blockchain analysis
+
 ## Common Development Commands
 
 ### Running Data Collection
@@ -66,6 +76,9 @@ python data-collection/2_marketcap-h4.py
 
 # Collect network activity data
 python data-collection/3_networkactivity-d1.py
+
+# Collect mining data
+python data-collection/4_secnmining-d1.py
 ```
 
 ### Data Management
@@ -74,11 +87,13 @@ python data-collection/3_networkactivity-d1.py
 ls -la data/raw/ohlcv/
 ls -la data/raw/marketcap/
 ls -la data/raw/networkactivity/
+ls -la data/raw/secnmining/
 
 # View data samples
 head data/raw/ohlcv/BTC_h4_ohlcv.csv
 head data/raw/marketcap/market_cap_h4.csv
 head data/raw/networkactivity/BTC_networkactivity.csv
+head data/raw/secnmining/BTC_mining_d1.csv
 ```
 
 ## Important Configuration Details
@@ -87,11 +102,13 @@ head data/raw/networkactivity/BTC_networkactivity.csv
 - Binance: 0.1s delay between requests
 - CoinMarketCap: 1s delay between requests, 2s between different coins
 - CoinMetrics: 6s delay between requests (10 requests per 6 seconds)
+- Blockchain.info: 1s delay between requests
 - Automatic chunking: 365-day chunks for large historical requests
 
 ### Timeframe and Data Granularity
 - Default timeframe: 4-hour (H4) intervals for OHLCV and market cap data
 - Network activity: Daily (D1) intervals
+- Mining metrics: Daily (D1) intervals
 - Historical coverage: From earliest available timestamp to present
 - Data processing: Automatic duplicate removal and forward-filling
 
@@ -99,6 +116,7 @@ head data/raw/networkactivity/BTC_networkactivity.csv
 - **OHLCV**: BTC, ETH (Binance USDT pairs)
 - **Market Cap**: BTC (ID: 1), ETH (ID: 1027), USDT (ID: 825), USDC (ID: 3408)
 - **Network Activity**: BTC, ETH (CoinMetrics metrics: Active Addresses, Transaction Count)
+- **Mining Metrics**: BTC (Blockchain.info metrics: Hash Rate, Difficulty, Miner Revenue)
 
 ## Development Notes
 
@@ -120,6 +138,7 @@ head data/raw/networkactivity/BTC_networkactivity.csv
 - Market Cap H4: ~11K records (1.1MB)
 - BTC Daily Network Activity: ~6.2K records (256KB)
 - ETH Daily Network Activity: ~3.8K records (162KB)
+- BTC Daily Mining Metrics: ~365 records (latest year)
 
 ## Network Activity Metrics
 
@@ -144,6 +163,31 @@ Network activity data complements price and market cap data by:
 - Enabling correlation analysis between on-chain activity and price movements
 - Supporting machine learning models with fundamental blockchain metrics
 - Offering insights into network health and adoption trends
+
+## Mining Metrics
+
+### Available Metrics
+The security and mining collector provides the following blockchain security metrics:
+- **Hash Rate**: Network computing power in tera hashes per second (TH/s)
+- **Mining Difficulty**: Relative measure of how difficult it is to find a new block
+- **Miner Revenue**: Total value of coinbase block rewards and transaction fees paid to miners (USD)
+
+### Data Sources
+- **Blockchain.info API**: Free public API with comprehensive mining statistics
+- **No API key required**: Public access to historical blockchain data
+- **Rate limited**: 1 request per second to ensure fair usage
+
+### Historical Coverage
+- **Bitcoin**: From 2009-01-03 to present (daily data)
+- **Automatic updates**: Extends to most recent available data
+- **Chunk-based collection**: 365-day chunks for efficient data retrieval
+
+### Integration Benefits
+Mining metrics data complements price and market data by:
+- Providing blockchain security indicators
+- Enabling correlation analysis between mining economics and price movements
+- Supporting machine learning models with network security metrics
+- Offering insights into mining network health and profitability trends
 
 ## Extension Points
 
