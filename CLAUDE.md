@@ -21,7 +21,7 @@ All settings are centralized in `config.py`:
 - Automatic directory creation via `ensure_directories()`
 
 ### Data Collection Pipeline
-Five main data collectors with no confirmation prompts (auto-start):
+Six main data collectors with no confirmation prompts (auto-start):
 
 1. **OHLCV Collector** (`data-collection/1_ohlcv-h4.py`):
    - Fetches H4 OHLCV data from Binance for BTC/ETH
@@ -47,6 +47,12 @@ Five main data collectors with no confirmation prompts (auto-start):
    - Fetches daily profit and value metrics from CoinMetrics for BTC/ETH
    - Collects MVRV Ratio, Exchange Inflows/Outflows, Exchange Supply, Realized Price
    - Saves to `data/raw/profitandvalue/{coin}_profitandvalue.csv`
+
+6. **Holder Behavior Collector** (`data-collection/6_holderbehavior-d1.py`):
+   - Fetches daily holder behavior metrics from CoinMetrics for BTC (free tier limitations)
+   - Collects Total Supply, MVRV Ratio, Exchange Flows, Exchange Supply
+   - Note: Advanced holder metrics (HODL Waves, Illiquid Supply, CDD, Whale Holdings) require paid APIs
+   - Saves to `data/raw/holderbehavior/{coin}_holderbehavior.csv`
 
 ### Data Structure
 
@@ -74,6 +80,11 @@ Five main data collectors with no confirmation prompts (auto-start):
 - Timestamp format: pandas datetime
 - Features: Daily profit indicators, exchange flows, and valuation metrics for analysis
 
+**Holder Behavior Data Format** (`data/raw/holderbehavior/`):
+- Columns: `timestamp, total_supply, mvrv_ratio, exchange_inflow_native, exchange_inflow_usd, exchange_outflow_native, exchange_outflow_usd, exchange_supply_native, exchange_supply_usd, net_flow_native, net_flow_usd, exchange_supply_pct`
+- Timestamp format: pandas datetime
+- Features: BTC-only holder behavior metrics with calculated fields for accumulation/distribution analysis
+
 ## Common Development Commands
 
 ### Running Data Collection
@@ -92,6 +103,9 @@ python data-collection/4_secureandmining-d1.py
 
 # Collect profit and value data
 python data-collection/5_profitandvalue-d1.py
+
+# Collect holder behavior data (BTC only - free tier)
+python data-collection/6_holderbehavior-d1.py
 ```
 
 ### Data Management
@@ -102,6 +116,7 @@ ls -la data/raw/marketcap/
 ls -la data/raw/networkactivity/
 ls -la data/raw/secureandmining/
 ls -la data/raw/profitandvalue/
+ls -la data/raw/holderbehavior/
 
 # View data samples
 head data/raw/ohlcv/BTC_h4_ohlcv.csv
@@ -109,6 +124,7 @@ head data/raw/marketcap/market_cap_h4.csv
 head data/raw/networkactivity/BTC_networkactivity.csv
 head data/raw/secureandmining/BTC_mining_d1.csv
 head data/raw/profitandvalue/BTC_profitandvalue.csv
+head data/raw/holderbehavior/BTC_holderbehavior.csv
 ```
 
 ## Important Configuration Details
@@ -133,6 +149,7 @@ head data/raw/profitandvalue/BTC_profitandvalue.csv
 - **Network Activity**: BTC, ETH (CoinMetrics metrics: Active Addresses, Transaction Count)
 - **Mining Metrics**: BTC (Blockchain.info metrics: Hash Rate, Difficulty, Miner Revenue)
 - **Profit and Value**: BTC, ETH (CoinMetrics metrics: MVRV, Exchange Flows, Exchange Supply, Realized Price)
+- **Holder Behavior**: BTC only (CoinMetrics metrics: Total Supply, MVRV, Exchange Flows, Exchange Supply)
 
 ## Development Notes
 
@@ -157,6 +174,7 @@ head data/raw/profitandvalue/BTC_profitandvalue.csv
 - BTC Daily Mining Metrics: ~365 records (latest year)
 - BTC Daily Profit and Value: ~6.2K records (1.1MB)
 - ETH Daily Profit and Value: ~3.8K records (0.8MB)
+- BTC Daily Holder Behavior: ~6.2K records (1.2MB)
 
 ## Network Activity Metrics
 
@@ -232,6 +250,38 @@ Profit and value data complements price and market data by:
 - Providing valuation metrics (MVRV) for market cycle analysis
 - Enabling analysis of exchange flow patterns and supply dynamics
 - Supporting machine learning models with on-chain valuation indicators
+
+## Holder Behavior Metrics
+
+### Available Metrics
+The holder behavior collector provides the following BTC holder metrics (free tier):
+- **Total Supply (SplyCur)**: Complete circulating supply of Bitcoin
+- **MVRV Ratio (CapMVRVCur)**: Market Value to Realized Value ratio
+- **Exchange Inflows/Outflows**: Native units and USD value flowing to/from exchanges
+- **Exchange Supply**: Total supply held on exchanges
+- **Calculated Metrics**: Net flows, exchange supply percentage
+
+### Data Sources
+- **CoinMetrics Community API**: Free tier with limited holder behavior metrics
+- **No API key required**: Public access to historical holder data
+- **Rate limited**: 10 requests per 6 seconds to ensure fair usage
+
+### Historical Coverage
+- **Bitcoin**: From 2009-01-03 to present (daily data)
+- **Automatic updates**: Extends to most recent available data
+- **Chunk-based collection**: 365-day chunks for efficient data retrieval
+
+### Limitations
+- **Free tier only**: Advanced holder metrics require paid subscriptions
+- **Missing metrics**: HODL Waves, Illiquid Supply, Coin Days Destroyed, Whale Holdings
+- **Premium sources**: Glassnode, CryptoQuant, Kaiko offer comprehensive holder analytics
+
+### Integration Benefits
+Holder behavior data complements price and market data by:
+- Providing exchange flow patterns for accumulation/distribution analysis
+- Enabling MVRV-based market cycle identification
+- Supporting machine learning models with holder positioning indicators
+- Offering insights into long-term vs short-term holder behavior
 
 ## Extension Points
 
