@@ -14,6 +14,7 @@ MARKETCAP_DIR = f"{RAW_DIR}/marketcap"
 NETWORKACTIVITY_DIR = f"{RAW_DIR}/networkactivity"
 SECUREANDMINING_DIR = f"{RAW_DIR}/secureandmining"
 PROFITANDVALUE_DIR = f"{RAW_DIR}/profitandvalue"
+HOLDERBEHAVIOR_DIR = f"{RAW_DIR}/holderbehavior"
 
 # API endpoints
 BINANCE_BASE_URL = "https://api.binance.com/api/v3"
@@ -49,6 +50,11 @@ PROFITANDVALUE_METRICS = {
     'ETH': ['CapMVRVCur', 'FlowInExNtv', 'FlowInExUSD', 'FlowOutExNtv', 'FlowOutExUSD', 'SplyExNtv', 'SplyExUSD']
 }
 
+# Holder behavior metrics configuration (BTC only - free tier limitations)
+HOLDERBEHAVIOR_METRICS = {
+    'BTC': ['SplyCur', 'CapMVRVCur', 'FlowInExNtv', 'FlowInExUSD', 'FlowOutExNtv', 'FlowOutExUSD', 'SplyExNtv', 'SplyExUSD']
+}
+
 # API parameters
 DEFAULT_TIMEFRAME = '4h'
 CHUNK_DAYS = 365
@@ -71,6 +77,10 @@ SECUREANDMINING_CHUNK_DAYS = 365
 PROFITANDVALUE_RATE_LIMIT = 6  # CoinMetrics: 10 requests per 6 seconds
 PROFITANDVALUE_CHUNK_DAYS = 365
 
+# Holder behavior API parameters
+HOLDERBEHAVIOR_RATE_LIMIT = 6  # CoinMetrics: 10 requests per 6 seconds
+HOLDERBEHAVIOR_CHUNK_DAYS = 365
+
 # Timeframes for aggregation
 AGGREGATION_TIMEFRAMES = {
     'D': '1d',
@@ -83,7 +93,7 @@ AGGREGATION_TIMEFRAMES = {
 def ensure_directories():
     """Create necessary directories if they don't exist"""
     directories = [
-        DATA_DIR, RAW_DIR, OHLCV_DIR, MARKETCAP_DIR, NETWORKACTIVITY_DIR, SECUREANDMINING_DIR, PROFITANDVALUE_DIR
+        DATA_DIR, RAW_DIR, OHLCV_DIR, MARKETCAP_DIR, NETWORKACTIVITY_DIR, SECUREANDMINING_DIR, PROFITANDVALUE_DIR, HOLDERBEHAVIOR_DIR
     ]
     for directory in directories:
         if not os.path.exists(directory):
@@ -109,3 +119,7 @@ def get_mining_file() -> str:
 def get_profitandvalue_file(coin: str) -> str:
     """Get profit and value file path for a coin (raw data)"""
     return f"{PROFITANDVALUE_DIR}/{coin}_profitandvalue.csv"
+
+def get_holderbehavior_file(coin: str) -> str:
+    """Get holder behavior file path for a coin (raw data)"""
+    return f"{HOLDERBEHAVIOR_DIR}/{coin}_holderbehavior.csv"
