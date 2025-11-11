@@ -1,6 +1,6 @@
 """
-Mining Metrics Daily Data Collector from Blockchain.info
-Fetches historical mining metrics for BTC with daily interval
+Security and Mining Metrics Daily Data Collector from Blockchain.info
+Fetches historical security and mining metrics for BTC with daily interval
 Collects: Hash Rate, Mining Difficulty, Miner Revenue
 No API key required - uses free public API
 """
@@ -10,7 +10,7 @@ import os
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from config import (
-    BLOCKCHAIN_API_BASE, MINING_METRICS, ensure_directories, get_mining_file, SECNMINING_DIR
+    BLOCKCHAIN_API_BASE, MINING_METRICS, ensure_directories, get_mining_file, SECUREANDMINING_DIR
 )
 
 import requests
@@ -83,7 +83,7 @@ class BlockchainInfoFetcher:
     def fetch_all_mining_metrics(self):
         """Fetch all configured mining metrics"""
         print(f"\n{'='*60}")
-        print(f"FETCH MINING METRICS DAILY DATA")
+        print(f"FETCH SECURITY AND MINING METRICS DAILY DATA")
         print(f"{'='*60}")
 
         print(f"Collecting BTC mining metrics")
@@ -153,22 +153,22 @@ class BlockchainInfoFetcher:
         filepath = get_mining_file()
         df.to_csv(filepath, index=False)
 
-        print(f"\n💾 Saved mining data: {filepath}")
+        print(f"\n💾 Saved security and mining data: {filepath}")
         print(f"   Size: {os.path.getsize(filepath) / 1024:.1f} KB")
         print(f"   Rows: {len(df):,}")
         print(f"   Date range: {df['timestamp'].min()} → {df['timestamp'].max()}")
 
     def generate_summary(self):
-        """Generate summary of collected mining data"""
+        """Generate summary of collected security and mining data"""
         print(f"\n{'='*60}")
         print(f"SUMMARY")
         print(f"{'='*60}")
 
         from pathlib import Path
-        mining_files = list(Path(SECNMINING_DIR).glob("*.csv"))
+        mining_files = list(Path(SECUREANDMINING_DIR).glob("*.csv"))
 
-        print(f"Mining files: {len(mining_files)}")
-        print(f"Location: {os.path.abspath(SECNMINING_DIR)}/")
+        print(f"Security and mining files: {len(mining_files)}")
+        print(f"Location: {os.path.abspath(SECUREANDMINING_DIR)}/")
 
         for file in mining_files:
             df = pd.read_csv(file)
@@ -187,11 +187,11 @@ class BlockchainInfoFetcher:
                         else:
                             print(f"      {col}: {latest[col]:,.0f}")
 
-        print(f"\n✅ Mining metrics data collection complete!")
+        print(f"\n✅ Security and mining metrics data collection complete!")
 
     def run(self):
         """Main execution method"""
-        print("MINING METRICS DAILY DATA COLLECTOR")
+        print("SECURITY AND MINING METRICS DAILY DATA COLLECTOR")
         print("Starting data collection...")
 
         start_time = time.time()
@@ -210,7 +210,7 @@ class BlockchainInfoFetcher:
         print(f"\n⏱️  Time: {elapsed/60:.2f} minutes")
         print(f"\n💡 Load data:")
         print(f"   import pandas as pd")
-        print(f"   df = pd.read_csv('data/raw/secnmining/BTC_mining_d1.csv')")
+        print(f"   df = pd.read_csv('data/raw/secureandmining/BTC_mining_d1.csv')")
         print(f"   df['timestamp'] = pd.to_datetime(df['timestamp'])")
         print(f"\n🎉 Ready for analysis!\n")
 
