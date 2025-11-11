@@ -1,0 +1,352 @@
+"""
+Profit and Value Daily Data Collector from CoinMetrics
+Fetches historical profit and value metrics for BTC and ETH with daily interval
+Collects: MVRV Ratio, Exchange Inflows/Outflows, Exchange Supply, calculates Realized Price
+No API key required - uses free Community API
+"""
+
+import sys
+import os
+import sys
+sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+
+from config import (
+    COINS, NETWORK_API_BASE, PROFITANDVALUE_METRICS,
+    PROFITANDVALUE_CHUNK_DAYS, PROFITANDVALUE_RATE_LIMIT,
+    ensure_directories, get_profitandvalue_file
+)
+
+import requests
+import pandas as pd
+import time
+from datetime import datetime, timedelta
+
+
+class CoinMetricsProfitAndValueFetcher:
+    def __init__(self):
+        self.base_url = NETWORK_API_BASE
+        ensure_directories()
+
+    def fetch_profit_and_value_metrics(self, coin, metrics, start_date, end_date):
+        """Fetch profit and value metrics for a specific date range"""
+        url = f"{self.base_url}/timeseries/asset-metrics"
+
+        params = {
+            'assets': coin.lower(),
+            'metrics': ','.join(metrics),
+            'start_time': start_date.strftime('%Y-%m-%d'),
+            'end_time': end_date.strftime('%Y-%m-%d'),
+            'frequency': '1d',
+            'page_size': 10000
+        }
+
+        try:
+            response = requests.get(url, params=params, timeout=60)
+
+            if response.status_code != 200:
+                print(f"  ❌ HTTP {response.status_code}")
+                return pd.DataFrame()
+
+            data = response.json()
+
+            if 'data' not in data or not data['data']:
+                print(f"  ⚠️ No data in response")
+                return pd.DataFrame()
+
+            records = []
+            for item in data['data']:
+                record = {'timestamp': pd.to_datetime(item['time'])}
+
+                # Map API metric names to readable column names
+                for metric in metrics:
+                    if metric in item:
+                        value = float(item[metric]) if item[metric] is not None else 0
+
+                        if metric == 'CapMVRVCur':
+                            record['mvrv_ratio'] = value
+                        elif metric == 'FlowInExNtv':
+                            record['exchange_inflow_native'] = value
+                        elif metric == 'FlowInExUSD':
+                            record['exchange_inflow_usd'] = value
+                        elif metric == 'FlowOutExNtv':
+                            record['exchange_outflow_native'] = value
+                        elif metric == 'FlowOutExUSD':
+                            record['exchange_outflow_usd'] = value
+                        elif metric == 'SplyExNtv':
+                            record['exchange_supply_native'] = value
+                        elif metric == 'SplyExUSD':
+                            record['exchange_supply_usd'] = value
+                        else:
+                            record[metric.lower()] = value
+
+                # Calculate derived metrics
+                if 'exchange_inflow_usd' in record and 'exchange_outflow_usd' in record:
+                    record['net_flow_usd'] = record['exchange_inflow_usd'] - record['exchange_outflow_usd']
+                if 'exchange_inflow_native' in record and 'exchange_outflow_native' in record:
+                    record['net_flow_native'] = record['exchange_inflow_native'] - record['exchange_outflow_native']
+
+                records.append(record)
+
+            df = pd.DataFrame(records)
+            print(f"  ✅ {len(df)} daily records")
+
+            return df
+
+        except Exception as e:
+            print(f"  ❌ Error: {e}")
+            return pd.DataFrame()
+
+    def fetch_coin_alltime(self, coin):
+        """Fetch all historical profit and value data for a coin"""
+        metrics = PROFITANDVALUE_METRICS.get(coin, [])
+        if not metrics:
+            print(f"  ⚠️ No metrics configured for {coin}")
+            return pd.DataFrame()
+
+        # Set appropriate start dates based on coin history
+        if coin == 'BTC':
+            start_date = datetime(2009, 1, 1)  # Bitcoin inception
+        elif coin == 'ETH':
+            start_date = datetime(2015, 7, 30)  # Ethereum launch
+        else:
+            start_date = datetime(2015, 1, 1)  # Default for other coins
+
+        end_date = datetime.now()
+
+        print(f"\n📊 Fetching {coin} profit and value metrics")
+        print(f"   Metrics: {', '.join(metrics)}")
+        print(f"   Range: {start_date.date()} → {end_date.date()}")
+
+        all_data = []
+        current_start = start_date
+        chunk_days = PROFITANDVALUE_CHUNK_DAYS
+
+        while current_start < end_date:
+            current_end = min(
+                current_start + timedelta(days=chunk_days),
+                end_date
+            )
+
+            print(f"   ⏳ {current_start.date()} → {current_end.date()}", end="")
+
+            df_chunk = self.fetch_profit_and_value_metrics(
+                coin, metrics, current_start, current_end
+            )
+
+            if not df_chunk.empty:
+                all_data.append(df_chunk)
+
+            current_start = current_end + timedelta(days=1)
+
+            # Rate limiting - CoinMetrics allows 10 requests per 6 seconds
+            time.sleep(PROFITANDVALUE_RATE_LIMIT)
+
+        if not all_data:
+            print(f"\n   ⚠️ No data collected for {coin}")
+            return pd.DataFrame()
+
+        df_full = pd.concat(all_data, ignore_index=True)
+        df_full = df_full.drop_duplicates(
+            subset=['timestamp']).sort_values('timestamp')
+        df_full = df_full.reset_index(drop=True)
+
+        # Forward-fill missing values and handle NaN values
+        numeric_cols = df_full.select_dtypes(include=['number']).columns
+        df_full[numeric_cols] = df_full[numeric_cols].ffill().fillna(0)
+
+        # Calculate realized price if MVRV and market cap data available
+        # We need to fetch market cap to calculate realized price: Realized Price = Market Cap / MVRV
+        df_full = self.calculate_derived_metrics(df_full, coin)
+
+        print(f"\n   ✅ Total: {len(df_full)} daily records")
+        print(f"   📅 {df_full['timestamp'].min()} → {df_full['timestamp'].max()}")
+
+        return df_full
+
+    def calculate_derived_metrics(self, df, coin):
+        """Calculate derived metrics like Realized Price from available data"""
+
+        # Fetch market cap data to calculate realized price
+        if 'mvrv_ratio' in df.columns and coin in ['BTC', 'ETH']:
+            df_with_realized = self.fetch_market_cap_for_realized_price(df, coin)
+            return df_with_realized
+
+        return df
+
+    def fetch_market_cap_for_realized_price(self, df, coin):
+        """Fetch market cap data to calculate realized price"""
+        print(f"   💰 Fetching market cap data for realized price calculation...")
+
+        try:
+            # Get market cap for the date range
+            start_date = df['timestamp'].min().strftime('%Y-%m-%d')
+            end_date = df['timestamp'].max().strftime('%Y-%m-%d')
+
+            url = f"{self.base_url}/timeseries/asset-metrics"
+            params = {
+                'assets': coin.lower(),
+                'metrics': 'CapMrktCurUSD',
+                'start_time': start_date,
+                'end_time': end_date,
+                'frequency': '1d',
+                'page_size': 10000
+            }
+
+            response = requests.get(url, params=params, timeout=60)
+
+            if response.status_code == 200:
+                data = response.json()
+
+                if 'data' in data and data['data']:
+                    market_cap_data = {}
+                    for item in data['data']:
+                        date = pd.to_datetime(item['time'])
+                        market_cap_data[date] = float(item['CapMrktCurUSD']) if item['CapMrktCurUSD'] else None
+
+                    # Calculate realized price: Realized Price = Market Cap / MVRV
+                    df['realized_price_usd'] = df.apply(
+                        lambda row: self.calculate_realized_price(
+                            row['timestamp'],
+                            row['mvrv_ratio'],
+                            market_cap_data
+                        ),
+                        axis=1
+                    )
+
+                    print(f"   ✅ Realized price calculated for {len(df)} records")
+
+        except Exception as e:
+            print(f"   ⚠️ Could not fetch market cap data: {e}")
+
+        return df
+
+    def calculate_realized_price(self, timestamp, mvrv_ratio, market_cap_data):
+        """Calculate realized price from market cap and MVRV ratio"""
+        try:
+            if pd.isna(mvrv_ratio) or mvrv_ratio <= 0:
+                return None
+
+            # Get market cap for this timestamp (use previous day if exact match not found)
+            market_cap = market_cap_data.get(timestamp)
+            if market_cap is None:
+                # Find closest previous date
+                for date in sorted(market_cap_data.keys(), reverse=True):
+                    if date <= timestamp and market_cap_data[date] is not None:
+                        market_cap = market_cap_data[date]
+                        break
+
+            if market_cap is None or market_cap <= 0:
+                return None
+
+            # Realized Price = Market Cap / MVRV
+            realized_price = market_cap / mvrv_ratio
+            return realized_price
+
+        except Exception:
+            return None
+
+    def fetch_all_coins(self):
+        """Fetch profit and value data for all configured coins"""
+        print(f"\n{'='*60}")
+        print(f"FETCH PROFIT AND VALUE DAILY DATA")
+        print(f"{'='*60}")
+
+        all_data = {}
+
+        for coin in COINS:
+            df = self.fetch_coin_alltime(coin)
+
+            if not df.empty:
+                all_data[coin] = df
+                # Save individual coin file
+                self.save_coin_csv(df, coin)
+
+            time.sleep(1)  # Small delay between coins
+
+        return all_data
+
+    def save_coin_csv(self, df, coin):
+        """Save profit and value data for a single coin"""
+        if df.empty:
+            return
+
+        filepath = get_profitandvalue_file(coin)
+        df.to_csv(filepath, index=False)
+
+        print(f"\n💾 Saved {coin}: {filepath}")
+        print(f"   Size: {os.path.getsize(filepath) / 1024:.1f} KB")
+        print(f"   Rows: {len(df):,}")
+        print(f"   Date range: {df['timestamp'].min()} → {df['timestamp'].max()}")
+
+    def generate_summary(self):
+        """Generate summary of collected profit and value data"""
+        print(f"\n{'='*60}")
+        print(f"SUMMARY")
+        print(f"{'='*60}")
+
+        from pathlib import Path
+        exchange_files = list(Path("data/raw/profitandvalue").glob("*.csv"))
+
+        print(f"Profit and value files: {len(exchange_files)}")
+        print(f"Location: {os.path.abspath('data/raw/profitandvalue')}/")
+
+        for file in exchange_files:
+            df = pd.read_csv(file)
+            print(f"  - {file.name}: {len(df):,} records")
+
+            # Show latest values for key metrics
+            if not df.empty:
+                latest = df.iloc[-1]
+                print(f"    Latest ({latest['timestamp'].split()[0]}):")
+                for col in df.columns:
+                    if col != 'timestamp' and pd.notna(latest[col]):
+                        if 'price' in col.lower() or 'usd' in col.lower():
+                            if col in ['realized_price_usd']:
+                                print(f"      {col}: ${latest[col]:,.2f}")
+                            else:
+                                print(f"      {col}: ${latest[col]:,.0f}")
+                        elif 'ratio' in col.lower():
+                            print(f"      {col}: {latest[col]:.3f}")
+                        else:
+                            print(f"      {col}: {latest[col]:,.2f}")
+
+        print(f"\n✅ Profit and value data collection complete!")
+
+    def run(self):
+        """Main execution method"""
+        print("PROFIT AND VALUE DAILY DATA COLLECTOR")
+        print("Starting data collection...")
+
+        start_time = time.time()
+
+        all_data = self.fetch_all_coins()
+
+        if all_data:
+            self.generate_summary()
+
+        elapsed = time.time() - start_time
+
+        print(f"\n{'='*60}")
+        print(f"✅ DONE!")
+        print(f"{'='*60}")
+        print(f"\n⏱️  Time: {elapsed/60:.2f} minutes")
+        print(f"\n💡 Load data:")
+        print(f"   import pandas as pd")
+        print(f"   df_btc = pd.read_csv('data/raw/profitandvalue/BTC_profitandvalue.csv')")
+        print(f"   df_eth = pd.read_csv('data/raw/profitandvalue/ETH_profitandvalue.csv')")
+        print(f"   df_btc['timestamp'] = pd.to_datetime(df_btc['timestamp'])")
+        print(f"   df_eth['timestamp'] = pd.to_datetime(df_eth['timestamp'])")
+        print(f"\n🎉 Ready for analysis!\n")
+
+
+if __name__ == "__main__":
+    try:
+        fetcher = CoinMetricsProfitAndValueFetcher()
+        fetcher.run()
+
+    except KeyboardInterrupt:
+        print("\n\n⚠️ Stopped (Ctrl+C)")
+    except Exception as e:
+        print(f"\n❌ ERROR: {e}")
+        import traceback
+        traceback.print_exc()

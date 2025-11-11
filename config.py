@@ -12,7 +12,8 @@ RAW_DIR = f"{DATA_DIR}/raw"
 OHLCV_DIR = f"{RAW_DIR}/ohlcv"
 MARKETCAP_DIR = f"{RAW_DIR}/marketcap"
 NETWORKACTIVITY_DIR = f"{RAW_DIR}/networkactivity"
-SECNMINING_DIR = f"{RAW_DIR}/secnmining"
+SECUREANDMINING_DIR = f"{RAW_DIR}/secureandmining"
+PROFITANDVALUE_DIR = f"{RAW_DIR}/profitandvalue"
 
 # API endpoints
 BINANCE_BASE_URL = "https://api.binance.com/api/v3"
@@ -42,6 +43,12 @@ MINING_METRICS = {
     'miners-revenue': {'name': 'Miners Revenue', 'unit': 'USD', 'description': 'Total mining revenue in USD'}
 }
 
+# Profit and value metrics configuration (available on CoinMetrics free tier)
+PROFITANDVALUE_METRICS = {
+    'BTC': ['CapMVRVCur', 'FlowInExNtv', 'FlowInExUSD', 'FlowOutExNtv', 'FlowOutExUSD', 'SplyExNtv', 'SplyExUSD'],
+    'ETH': ['CapMVRVCur', 'FlowInExNtv', 'FlowInExUSD', 'FlowOutExNtv', 'FlowOutExUSD', 'SplyExNtv', 'SplyExUSD']
+}
+
 # API parameters
 DEFAULT_TIMEFRAME = '4h'
 CHUNK_DAYS = 365
@@ -56,6 +63,14 @@ NETWORK_CHUNK_DAYS = 365
 MINING_RATE_LIMIT = 1  # Blockchain.info: 1 request per second
 MINING_CHUNK_DAYS = 365
 
+# Secure and mining API parameters
+SECUREANDMINING_RATE_LIMIT = 1  # Blockchain.info: 1 request per second
+SECUREANDMINING_CHUNK_DAYS = 365
+
+# Profit and value API parameters
+PROFITANDVALUE_RATE_LIMIT = 6  # CoinMetrics: 10 requests per 6 seconds
+PROFITANDVALUE_CHUNK_DAYS = 365
+
 # Timeframes for aggregation
 AGGREGATION_TIMEFRAMES = {
     'D': '1d',
@@ -68,7 +83,7 @@ AGGREGATION_TIMEFRAMES = {
 def ensure_directories():
     """Create necessary directories if they don't exist"""
     directories = [
-        DATA_DIR, RAW_DIR, OHLCV_DIR, MARKETCAP_DIR, NETWORKACTIVITY_DIR, SECNMINING_DIR
+        DATA_DIR, RAW_DIR, OHLCV_DIR, MARKETCAP_DIR, NETWORKACTIVITY_DIR, SECUREANDMINING_DIR, PROFITANDVALUE_DIR
     ]
     for directory in directories:
         if not os.path.exists(directory):
@@ -89,4 +104,8 @@ def get_networkactivity_file(coin: str) -> str:
 
 def get_mining_file() -> str:
     """Get mining metrics file path (raw data)"""
-    return f"{SECNMINING_DIR}/BTC_mining_d1.csv"
+    return f"{SECUREANDMINING_DIR}/BTC_mining_d1.csv"
+
+def get_profitandvalue_file(coin: str) -> str:
+    """Get profit and value file path for a coin (raw data)"""
+    return f"{PROFITANDVALUE_DIR}/{coin}_profitandvalue.csv"

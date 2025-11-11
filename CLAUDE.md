@@ -7,7 +7,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 Crypto Price Forecaster is a cryptocurrency data collection and preprocessing system designed for machine learning and technical analysis. The project collects historical OHLCV (Open, High, Low, Close, Volume) data and market cap data for major cryptocurrencies from multiple API sources.
 
 **Primary focus**: Historical data collection for BTC/ETH with multiple timeframes (H4, Daily)
-**Data sources**: Binance API (OHLCV), CoinMarketCap API (market cap), CoinMetrics API (network activity), Blockchain.info API (mining metrics)
+**Data sources**: Binance API (OHLCV), CoinMarketCap API (market cap), CoinMetrics API (network activity & profit metrics), Blockchain.info API (mining metrics)
 **Architecture**: Modular, config-driven design with organized data storage
 
 ## Key Architecture
@@ -21,7 +21,7 @@ All settings are centralized in `config.py`:
 - Automatic directory creation via `ensure_directories()`
 
 ### Data Collection Pipeline
-Three main data collectors with no confirmation prompts (auto-start):
+Five main data collectors with no confirmation prompts (auto-start):
 
 1. **OHLCV Collector** (`data-collection/1_ohlcv-h4.py`):
    - Fetches H4 OHLCV data from Binance for BTC/ETH
@@ -38,10 +38,15 @@ Three main data collectors with no confirmation prompts (auto-start):
    - Collects Active Addresses and Transaction Count
    - Saves to `data/raw/networkactivity/{coin}_networkactivity.csv`
 
-4. **Security and Mining Collector** (`data-collection/4_secnmining-d1.py`):
-   - Fetches daily mining metrics from Blockchain.info for BTC
+4. **Security and Mining Collector** (`data-collection/4_secureandmining-d1.py`):
+   - Fetches daily security and mining metrics from Blockchain.info for BTC
    - Collects Hash Rate, Mining Difficulty, and Miner Revenue
-   - Saves to `data/raw/secnmining/BTC_mining_d1.csv`
+   - Saves to `data/raw/secureandmining/BTC_mining_d1.csv`
+
+5. **Profit and Value Collector** (`data-collection/5_profitandvalue-d1.py`):
+   - Fetches daily profit and value metrics from CoinMetrics for BTC/ETH
+   - Collects MVRV Ratio, Exchange Inflows/Outflows, Exchange Supply, Realized Price
+   - Saves to `data/raw/profitandvalue/{coin}_profitandvalue.csv`
 
 ### Data Structure
 
@@ -59,10 +64,15 @@ Three main data collectors with no confirmation prompts (auto-start):
 - Timestamp format: pandas datetime
 - Features: Daily on-chain network metrics for blockchain analysis
 
-**Mining Data Format** (`data/raw/secnmining/`):
+**Mining Data Format** (`data/raw/secureandmining/`):
 - Columns: `timestamp, hash_rate_ths, mining_difficulty, miner_revenue_usd`
 - Timestamp format: pandas datetime
 - Features: Daily mining security metrics for blockchain analysis
+
+**Profit and Value Data Format** (`data/raw/profitandvalue/`):
+- Columns: `timestamp, mvrv_ratio, exchange_inflow_native, exchange_inflow_usd, exchange_outflow_native, exchange_outflow_usd, exchange_supply_native, exchange_supply_usd, net_flow_usd, net_flow_native, realized_price_usd`
+- Timestamp format: pandas datetime
+- Features: Daily profit indicators, exchange flows, and valuation metrics for analysis
 
 ## Common Development Commands
 
@@ -77,8 +87,11 @@ python data-collection/2_marketcap-h4.py
 # Collect network activity data
 python data-collection/3_networkactivity-d1.py
 
-# Collect mining data
-python data-collection/4_secnmining-d1.py
+# Collect security and mining data
+python data-collection/4_secureandmining-d1.py
+
+# Collect profit and value data
+python data-collection/5_profitandvalue-d1.py
 ```
 
 ### Data Management
@@ -87,13 +100,15 @@ python data-collection/4_secnmining-d1.py
 ls -la data/raw/ohlcv/
 ls -la data/raw/marketcap/
 ls -la data/raw/networkactivity/
-ls -la data/raw/secnmining/
+ls -la data/raw/secureandmining/
+ls -la data/raw/profitandvalue/
 
 # View data samples
 head data/raw/ohlcv/BTC_h4_ohlcv.csv
 head data/raw/marketcap/market_cap_h4.csv
 head data/raw/networkactivity/BTC_networkactivity.csv
-head data/raw/secnmining/BTC_mining_d1.csv
+head data/raw/secureandmining/BTC_mining_d1.csv
+head data/raw/profitandvalue/BTC_profitandvalue.csv
 ```
 
 ## Important Configuration Details
@@ -117,6 +132,7 @@ head data/raw/secnmining/BTC_mining_d1.csv
 - **Market Cap**: BTC (ID: 1), ETH (ID: 1027), USDT (ID: 825), USDC (ID: 3408)
 - **Network Activity**: BTC, ETH (CoinMetrics metrics: Active Addresses, Transaction Count)
 - **Mining Metrics**: BTC (Blockchain.info metrics: Hash Rate, Difficulty, Miner Revenue)
+- **Profit and Value**: BTC, ETH (CoinMetrics metrics: MVRV, Exchange Flows, Exchange Supply, Realized Price)
 
 ## Development Notes
 
@@ -139,6 +155,8 @@ head data/raw/secnmining/BTC_mining_d1.csv
 - BTC Daily Network Activity: ~6.2K records (256KB)
 - ETH Daily Network Activity: ~3.8K records (162KB)
 - BTC Daily Mining Metrics: ~365 records (latest year)
+- BTC Daily Profit and Value: ~6.2K records (1.1MB)
+- ETH Daily Profit and Value: ~3.8K records (0.8MB)
 
 ## Network Activity Metrics
 
@@ -188,6 +206,32 @@ Mining metrics data complements price and market data by:
 - Enabling correlation analysis between mining economics and price movements
 - Supporting machine learning models with network security metrics
 - Offering insights into mining network health and profitability trends
+
+## Profit and Value Metrics
+
+### Available Metrics
+The profit and value collector provides the following valuation and flow metrics:
+- **MVRV Ratio (CapMVRVCur)**: Market Value to Realized Value ratio
+- **Exchange Inflows/Outflows**: Native units and USD value flowing to/from exchanges
+- **Exchange Supply**: Total supply held on exchanges
+- **Net Flows**: Calculated net exchange flows (inflows - outflows)
+- **Realized Price**: Calculated from market cap and MVRV ratio
+
+### Data Sources
+- **CoinMetrics Community API**: Free tier with comprehensive on-chain valuation metrics
+- **No API key required**: Public access to historical valuation data
+- **Rate limited**: 10 requests per 6 seconds to ensure fair usage
+
+### Historical Coverage
+- **Bitcoin**: From 2009-01-03 to present (daily data)
+- **Ethereum**: From 2015-07-30 to present (daily data)
+- **Automatic updates**: Extends to most recent available data
+
+### Integration Benefits
+Profit and value data complements price and market data by:
+- Providing valuation metrics (MVRV) for market cycle analysis
+- Enabling analysis of exchange flow patterns and supply dynamics
+- Supporting machine learning models with on-chain valuation indicators
 
 ## Extension Points
 
