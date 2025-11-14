@@ -4,11 +4,11 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-Crypto Price Forecaster is a cryptocurrency data collection and preprocessing system designed for machine learning and technical analysis. The project collects historical OHLCV (Open, High, Low, Close, Volume) data and market cap data for major cryptocurrencies from multiple API sources.
+Crypto Price Forecaster is a cryptocurrency data collection and preprocessing system designed for machine learning and technical analysis. The project collects historical OHLCV (Open, High, Low, Close, Volume) data, market cap data, and news articles for major cryptocurrencies from multiple API sources.
 
-**Primary focus**: Historical data collection for BTC/ETH with multiple timeframes (H4, Daily)
-**Data sources**: Binance API (OHLCV), CoinMarketCap API (market cap), CoinMetrics API (network activity & profit metrics), Blockchain.info API (mining metrics)
-**Architecture**: Modular, config-driven design with organized data storage
+**Primary focus**: Historical data collection for BTC/ETH with multiple timeframes (H4, Daily) + comprehensive news scraping
+**Data sources**: Binance API (OHLCV), CoinMarketCap API (market cap), CoinMetrics API (network activity & profit metrics), Blockchain.info API (mining metrics), Bitcoin Magazine (news articles)
+**Architecture**: Modular, config-driven design with organized data storage and robust web scraping capabilities
 
 ## Key Architecture
 
@@ -21,7 +21,7 @@ All settings are centralized in `config.py`:
 - Automatic directory creation via `ensure_directories()`
 
 ### Data Collection Pipeline
-Six main data collectors with no confirmation prompts (auto-start):
+Seven main data collectors with no confirmation prompts (auto-start):
 
 1. **OHLCV Collector** (`data-collection/1_ohlcv-h4.py`):
    - Fetches H4 OHLCV data from Binance for BTC/ETH
@@ -54,6 +54,13 @@ Six main data collectors with no confirmation prompts (auto-start):
    - Note: Advanced holder metrics (HODL Waves, Illiquid Supply, CDD, Whale Holdings) require paid APIs
    - Saves to `data/raw/holderbehavior/{coin}_holderbehavior.csv`
 
+7. **Bitcoin Magazine News Scraper** (`data-collection/7_bitcoinmagazinenews-all.py`):
+   - Scrapes all Bitcoin Magazine articles with comprehensive error handling and resume functionality
+   - Features: Serial ID tracking, progress bars with tqdm, automatic HTML file naming with article timestamps
+   - Robots.txt compliance with bingbot user agent and 3-second delays
+   - Saves to `data/raw/news/bitcoinmagazinenews.csv` and `data/raw/news/html/{ID}_{timestamp}.html`
+   - **COMPLETED**: 13,391 total articles, 13,391 crawled (100% success), 0 failed, 0 pending
+
 ### Data Structure
 
 **OHLCV Data Format** (`data/raw/ohlcv/`):
@@ -85,6 +92,17 @@ Six main data collectors with no confirmation prompts (auto-start):
 - Timestamp format: pandas datetime
 - Features: BTC-only holder behavior metrics with calculated fields for accumulation/distribution analysis
 
+**Bitcoin Magazine News Data Format** (`data/raw/news/`):
+- **CSV Format**: `id, datetime, url, status` (13,391 articles)
+  - `id`: Serial number (1-13391)
+  - `datetime`: Article publication time (ISO format)
+  - `url`: Full article URL
+  - `status`: All articles completed (status=1)
+- **HTML Files**: `data/raw/news/html/{ID}_{YYYYMMDD_HHMMSS}.html`
+  - Named by article ID and publication timestamp
+  - Perfect synchronization between CSV and actual files
+  - 13,391 HTML files (100% complete coverage)
+
 ## Common Development Commands
 
 ### Running Data Collection
@@ -106,6 +124,9 @@ python data-collection/5_profitandvalue-d1.py
 
 # Collect holder behavior data (BTC only - free tier)
 python data-collection/6_holderbehavior-d1.py
+
+# Scrape Bitcoin Magazine news (completed - 13,391 articles)
+python data-collection/7_bitcoinmagazinenews-all.py
 ```
 
 ### Data Management
@@ -117,6 +138,7 @@ ls -la data/raw/networkactivity/
 ls -la data/raw/secureandmining/
 ls -la data/raw/profitandvalue/
 ls -la data/raw/holderbehavior/
+ls -la data/raw/news/
 
 # View data samples
 head data/raw/ohlcv/BTC_h4_ohlcv.csv
@@ -125,6 +147,7 @@ head data/raw/networkactivity/BTC_networkactivity.csv
 head data/raw/secureandmining/BTC_mining_d1.csv
 head data/raw/profitandvalue/BTC_profitandvalue.csv
 head data/raw/holderbehavior/BTC_holderbehavior.csv
+head data/raw/news/bitcoinmagazinenews.csv
 ```
 
 ## Important Configuration Details
@@ -175,6 +198,7 @@ head data/raw/holderbehavior/BTC_holderbehavior.csv
 - BTC Daily Profit and Value: ~6.2K records (1.1MB)
 - ETH Daily Profit and Value: ~3.8K records (0.8MB)
 - BTC Daily Holder Behavior: ~6.2K records (1.2MB)
+- Bitcoin Magazine News: 13,391 complete articles (CSV + HTML files)
 
 ## Network Activity Metrics
 
