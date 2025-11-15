@@ -61,6 +61,13 @@ Seven main data collectors with no confirmation prompts (auto-start):
    - Saves to `data/raw/news/bitcoinmagazinenews.csv` and `data/raw/news/html/{ID}_{timestamp}.html`
    - **COMPLETED**: 13,391 total articles, 13,391 crawled (100% success), 0 failed, 0 pending
 
+8. **Sentiment Index Collector** (`data-collection/8_sentimentindex-d1.py`):
+   - Fetches Fear & Greed Index data from Alternative.me free API
+   - Collects daily sentiment values (0-100 scale) and classification labels
+   - Coverage: 2018-present with complete historical data (2,841 daily records)
+   - Saves to `data/raw/sentimentindex/fear_greed_index_d1.csv`
+   - **COMPLETED**: 2,841 daily records from 2018-02-01 to 2025-11-15
+
 ### Data Structure
 
 **OHLCV Data Format** (`data/raw/ohlcv/`):
@@ -103,6 +110,15 @@ Seven main data collectors with no confirmation prompts (auto-start):
   - Perfect synchronization between CSV and actual files
   - 13,391 HTML files (100% complete coverage)
 
+**Sentiment Index Data Format** (`data/raw/sentimentindex/`):
+- **Columns**: `timestamp, value, classification` (2,841 daily records)
+  - `timestamp`: pandas datetime format
+  - `value`: Fear & Greed Index score (0-100 scale)
+  - `classification`: Sentiment label (Extreme Fear, Fear, Neutral, Greed, Extreme Greed)
+- **Coverage**: 2018-02-01 to present (complete daily historical data)
+- **Source**: Alternative.me Fear & Greed Index API
+- **Distribution**: Fear (819 days), Greed (789 days), Extreme Fear (564 days), Neutral (388 days), Extreme Greed (281 days)
+
 ## Common Development Commands
 
 ### Running Data Collection
@@ -127,6 +143,9 @@ python data-collection/6_holderbehavior-d1.py
 
 # Scrape Bitcoin Magazine news (completed - 13,391 articles)
 python data-collection/7_bitcoinmagazinenews-all.py
+
+# Collect sentiment index data (Fear & Greed)
+python data-collection/8_sentimentindex-d1.py
 ```
 
 ### Data Management
@@ -139,6 +158,7 @@ ls -la data/raw/secureandmining/
 ls -la data/raw/profitandvalue/
 ls -la data/raw/holderbehavior/
 ls -la data/raw/news/
+ls -la data/raw/sentimentindex/
 
 # View data samples
 head data/raw/ohlcv/BTC_h4_ohlcv.csv
@@ -148,6 +168,7 @@ head data/raw/secureandmining/BTC_mining_d1.csv
 head data/raw/profitandvalue/BTC_profitandvalue.csv
 head data/raw/holderbehavior/BTC_holderbehavior.csv
 head data/raw/news/bitcoinmagazinenews.csv
+head data/raw/sentimentindex/fear_greed_index_d1.csv
 ```
 
 ## Important Configuration Details
@@ -199,6 +220,7 @@ head data/raw/news/bitcoinmagazinenews.csv
 - ETH Daily Profit and Value: ~3.8K records (0.8MB)
 - BTC Daily Holder Behavior: ~6.2K records (1.2MB)
 - Bitcoin Magazine News: 13,391 complete articles (CSV + HTML files)
+- Fear & Greed Daily Sentiment: 2,841 records (200KB)
 
 ## Network Activity Metrics
 
@@ -306,6 +328,37 @@ Holder behavior data complements price and market data by:
 - Enabling MVRV-based market cycle identification
 - Supporting machine learning models with holder positioning indicators
 - Offering insights into long-term vs short-term holder behavior
+
+## Sentiment Index Metrics
+
+### Available Metrics
+The sentiment index collector provides the following market sentiment metrics:
+- **Fear & Greed Index**: Composite market sentiment score (0-100 scale)
+- **Classification**: Sentiment category (Extreme Fear, Fear, Neutral, Greed, Extreme Greed)
+
+### Data Sources
+- **Alternative.me API**: Free public API with comprehensive Fear & Greed Index data
+- **No API key required**: Public access to historical sentiment data
+- **Rate limited**: 1 request per hour (respectful limit for API stability)
+
+### Historical Coverage
+- **Fear & Greed Index**: From 2018-02-01 to present (daily data)
+- **Complete coverage**: 2,841 daily records with no gaps
+- **Automatic updates**: Extends to most recent available data
+
+### Integration Benefits
+Sentiment index data complements price and market data by:
+- Providing market sentiment indicators for trading psychology analysis
+- Enabling correlation analysis between sentiment and price movements
+- Supporting machine learning models with market sentiment features
+- Offering insights into market cycle identification and reversal signals
+
+### Sentiment Classification Scale
+- **0-24**: Extreme Fear (historical buying opportunities)
+- **25-44**: Fear (accumulation phase)
+- **45-55**: Neutral (balanced market conditions)
+- **56-75**: Greed (distribution phase)
+- **76-100**: Extreme Greed (historical selling opportunities)
 
 ## Extension Points
 
