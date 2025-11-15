@@ -15,12 +15,14 @@ NETWORKACTIVITY_DIR = f"{RAW_DIR}/networkactivity"
 SECUREANDMINING_DIR = f"{RAW_DIR}/secureandmining"
 PROFITANDVALUE_DIR = f"{RAW_DIR}/profitandvalue"
 HOLDERBEHAVIOR_DIR = f"{RAW_DIR}/holderbehavior"
+SENTIMENTINDEX_DIR = f"{RAW_DIR}/sentimentindex"
 
 # API endpoints
 BINANCE_BASE_URL = "https://api.binance.com/api/v3"
 CMC_API_BASE = "https://api.coinmarketcap.com/data-api/v3"
 NETWORK_API_BASE = "https://community-api.coinmetrics.io/v4"
 BLOCKCHAIN_API_BASE = "https://api.blockchain.info/charts"
+SENTIMENTINDEX_API_BASE = "https://api.alternative.me/fng"
 
 # Coin configurations
 COINS = ['BTC', 'ETH']
@@ -81,6 +83,9 @@ PROFITANDVALUE_CHUNK_DAYS = 365
 HOLDERBEHAVIOR_RATE_LIMIT = 6  # CoinMetrics: 10 requests per 6 seconds
 HOLDERBEHAVIOR_CHUNK_DAYS = 365
 
+# Sentiment Index API parameters
+SENTIMENTINDEX_RATE_LIMIT = 3600  # Alternative.me: 1 request per hour (respectful limit)
+
 # Timeframes for aggregation
 AGGREGATION_TIMEFRAMES = {
     'D': '1d',
@@ -93,7 +98,7 @@ AGGREGATION_TIMEFRAMES = {
 def ensure_directories():
     """Create necessary directories if they don't exist"""
     directories = [
-        DATA_DIR, RAW_DIR, OHLCV_DIR, MARKETCAP_DIR, NETWORKACTIVITY_DIR, SECUREANDMINING_DIR, PROFITANDVALUE_DIR, HOLDERBEHAVIOR_DIR
+        DATA_DIR, RAW_DIR, OHLCV_DIR, MARKETCAP_DIR, NETWORKACTIVITY_DIR, SECUREANDMINING_DIR, PROFITANDVALUE_DIR, HOLDERBEHAVIOR_DIR, SENTIMENTINDEX_DIR
     ]
     for directory in directories:
         if not os.path.exists(directory):
@@ -123,3 +128,7 @@ def get_profitandvalue_file(coin: str) -> str:
 def get_holderbehavior_file(coin: str) -> str:
     """Get holder behavior file path for a coin (raw data)"""
     return f"{HOLDERBEHAVIOR_DIR}/{coin}_holderbehavior.csv"
+
+def get_sentimentindex_file() -> str:
+    """Get sentiment index file path (raw data)"""
+    return f"{SENTIMENTINDEX_DIR}/fear_greed_index_d1.csv"
