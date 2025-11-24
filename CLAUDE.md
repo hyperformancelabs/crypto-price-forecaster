@@ -21,16 +21,16 @@ All settings are centralized in `config.py`:
 - Automatic directory creation via `ensure_directories()`
 
 ### Data Collection Pipeline
-Seven main data collectors with no confirmation prompts (auto-start):
+Eight main data collectors with no confirmation prompts (auto-start):
 
 1. **OHLCV Collector** (`data-collection/1_ohlcv-h4.py`):
    - Fetches H4 OHLCV data from Binance for BTC/ETH
-   - Calculates log returns and technical indicators
+   - Collects raw price data only (no calculated indicators)
    - Saves to `data/raw/ohlcv/{coin}_h4_ohlcv.csv`
 
 2. **Market Cap Collector** (`data-collection/2_marketcap-h4.py`):
    - Fetches H4 market cap data from CoinMarketCap for BTC, ETH, USDT, USDC
-   - Merges multi-coin data and calculates total market cap
+   - Collects individual coin market caps only (no calculated total)
    - Saves to `data/raw/marketcap/market_cap_h4.csv`
 
 3. **Network Activity Collector** (`data-collection/3_networkactivity-d1.py`):
@@ -45,12 +45,12 @@ Seven main data collectors with no confirmation prompts (auto-start):
 
 5. **Profit and Value Collector** (`data-collection/5_profitandvalue-d1.py`):
    - Fetches daily profit and value metrics from CoinMetrics for BTC/ETH
-   - Collects MVRV Ratio, Exchange Inflows/Outflows, Exchange Supply, Realized Price
+   - Collects MVRV Ratio, Exchange Inflows/Outflows, Exchange Supply (raw API data only)
    - Saves to `data/raw/profitandvalue/{coin}_profitandvalue.csv`
 
 6. **Holder Behavior Collector** (`data-collection/6_holderbehavior-d1.py`):
    - Fetches daily holder behavior metrics from CoinMetrics for BTC (free tier limitations)
-   - Collects Total Supply, MVRV Ratio, Exchange Flows, Exchange Supply
+   - Collects Total Supply, MVRV Ratio, Exchange Flows, Exchange Supply (raw API data only)
    - Note: Advanced holder metrics (HODL Waves, Illiquid Supply, CDD, Whale Holdings) require paid APIs
    - Saves to `data/raw/holderbehavior/{coin}_holderbehavior.csv`
 
@@ -71,13 +71,13 @@ Seven main data collectors with no confirmation prompts (auto-start):
 ### Data Structure
 
 **OHLCV Data Format** (`data/raw/ohlcv/`):
-- Columns: `timestamp, open, high, low, close, volume, quote_volume, log_returns, trades`
+- Columns: `timestamp, open, high, low, close, volume, quote_volume, trades`
 - Timestamp format: pandas datetime
-- Features: Includes calculated log returns for ML analysis
+- Features: Raw price data only (no calculated indicators)
 
 **Market Cap Data Format** (`data/raw/marketcap/`):
-- Columns: `timestamp, total_market_cap, BTC_market_cap, ETH_market_cap, USDT_market_cap, USDC_market_cap`
-- Features: Individual and total market cap calculations
+- Columns: `timestamp, BTC_market_cap, ETH_market_cap, USDT_market_cap, USDC_market_cap`
+- Features: Individual coin market caps from CoinMarketCap API (no calculated total)
 
 **Network Activity Data Format** (`data/raw/networkactivity/`):
 - Columns: `timestamp, active_addresses, tx_count`
@@ -90,14 +90,14 @@ Seven main data collectors with no confirmation prompts (auto-start):
 - Features: Daily mining security metrics for blockchain analysis
 
 **Profit and Value Data Format** (`data/raw/profitandvalue/`):
-- Columns: `timestamp, mvrv_ratio, exchange_inflow_native, exchange_inflow_usd, exchange_outflow_native, exchange_outflow_usd, exchange_supply_native, exchange_supply_usd, net_flow_usd, net_flow_native, realized_price_usd`
+- Columns: `timestamp, mvrv_ratio, exchange_inflow_native, exchange_inflow_usd, exchange_outflow_native, exchange_outflow_usd, exchange_supply_native, exchange_supply_usd`
 - Timestamp format: pandas datetime
-- Features: Daily profit indicators, exchange flows, and valuation metrics for analysis
+- Features: Raw on-chain metrics from CoinMetrics API (no calculated fields)
 
 **Holder Behavior Data Format** (`data/raw/holderbehavior/`):
-- Columns: `timestamp, total_supply, mvrv_ratio, exchange_inflow_native, exchange_inflow_usd, exchange_outflow_native, exchange_outflow_usd, exchange_supply_native, exchange_supply_usd, net_flow_native, net_flow_usd, exchange_supply_pct`
+- Columns: `timestamp, total_supply, mvrv_ratio, exchange_inflow_native, exchange_inflow_usd, exchange_outflow_native, exchange_outflow_usd, exchange_supply_native, exchange_supply_usd`
 - Timestamp format: pandas datetime
-- Features: BTC-only holder behavior metrics with calculated fields for accumulation/distribution analysis
+- Features: Raw BTC holder behavior metrics from CoinMetrics API (no calculated fields)
 
 **Bitcoin Magazine News Data Format** (`data/raw/news/`):
 - **CSV Format**: `id, datetime, url, status` (13,391 articles)
@@ -192,8 +192,32 @@ head data/raw/sentimentindex/fear_greed_index_d1.csv
 - **Market Cap**: BTC (ID: 1), ETH (ID: 1027), USDT (ID: 825), USDC (ID: 3408)
 - **Network Activity**: BTC, ETH (CoinMetrics metrics: Active Addresses, Transaction Count)
 - **Mining Metrics**: BTC (Blockchain.info metrics: Hash Rate, Difficulty, Miner Revenue)
-- **Profit and Value**: BTC, ETH (CoinMetrics metrics: MVRV, Exchange Flows, Exchange Supply, Realized Price)
+- **Profit and Value**: BTC, ETH (CoinMetrics metrics: MVRV, Exchange Flows, Exchange Supply)
 - **Holder Behavior**: BTC only (CoinMetrics metrics: Total Supply, MVRV, Exchange Flows, Exchange Supply)
+
+## Data Collection Philosophy
+
+### Low-Level Data Collection Only
+This system follows a strict "collect-only" philosophy:
+- **Raw API Data Only**: All collected features come directly from legitimate API responses or web scraping
+- **No Calculations**: No arithmetic operations, derived metrics, or synthetic data during collection
+- **No Estimations**: No fallback to fake/random data or artificial assumptions
+- **Processing Stage Separation**: All calculations (net flows, percentages, log returns) are moved to data processing stage
+
+### Data Source Authenticity
+All 8 collectors use authoritative, legitimate sources:
+- **Binance API**: Real exchange OHLCV data
+- **CoinMarketCap API**: Real cryptocurrency market cap data
+- **CoinMetrics API**: Real blockchain on-chain metrics
+- **Blockchain.info API**: Real Bitcoin mining statistics
+- **Alternative.me API**: Real market sentiment data
+- **Bitcoin Magazine**: Direct web scraping of real news content
+
+### Benefits of Low-Level Collection
+- **Data Integrity**: 100% authentic data with no synthetic contamination
+- **Flexibility**: Derived metrics can be recalculated with different parameters
+- **Reliability**: Raw data sources are stable and verifiable
+- **ML Ready**: Clean foundation for machine learning pipelines
 
 ## Development Notes
 
@@ -278,8 +302,7 @@ The profit and value collector provides the following valuation and flow metrics
 - **MVRV Ratio (CapMVRVCur)**: Market Value to Realized Value ratio
 - **Exchange Inflows/Outflows**: Native units and USD value flowing to/from exchanges
 - **Exchange Supply**: Total supply held on exchanges
-- **Net Flows**: Calculated net exchange flows (inflows - outflows)
-- **Realized Price**: Calculated from market cap and MVRV ratio
+- **Note**: Net flows and realized price are calculated during data processing, not collection
 
 ### Data Sources
 - **CoinMetrics Community API**: Free tier with comprehensive on-chain valuation metrics
@@ -305,7 +328,7 @@ The holder behavior collector provides the following BTC holder metrics (free ti
 - **MVRV Ratio (CapMVRVCur)**: Market Value to Realized Value ratio
 - **Exchange Inflows/Outflows**: Native units and USD value flowing to/from exchanges
 - **Exchange Supply**: Total supply held on exchanges
-- **Calculated Metrics**: Net flows, exchange supply percentage
+- **Note**: Net flows and exchange supply percentage are calculated during data processing, not collection
 
 ### Data Sources
 - **CoinMetrics Community API**: Free tier with limited holder behavior metrics

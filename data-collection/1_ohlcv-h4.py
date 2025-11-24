@@ -95,11 +95,8 @@ class BinanceFetcher:
         for col in ['open', 'high', 'low', 'close', 'volume', 'quote_volume']:
             df[col] = df[col].astype(float)
 
-        df['log_returns'] = np.log(df['close'] / df['close'].shift(1))
-        df['log_returns'] = df['log_returns'].fillna(0)
-
         df = df[['timestamp', 'open', 'high', 'low', 'close', 'volume',
-                 'quote_volume', 'log_returns', 'trades']]
+                 'quote_volume', 'trades']]
 
         return df
 
