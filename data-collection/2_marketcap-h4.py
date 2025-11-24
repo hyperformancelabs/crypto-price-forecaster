@@ -158,14 +158,7 @@ class MarketCapH4Fetcher:
         merged = merged.sort_values('timestamp').reset_index(drop=True)
         merged = merged.ffill().fillna(0)
 
-        merged['total_market_cap'] = (
-            merged['BTC_market_cap'] +
-            merged['ETH_market_cap'] +
-            merged['USDT_market_cap'] +
-            merged['USDC_market_cap']
-        ) * 2.0
-
-        cols = ['timestamp', 'total_market_cap'] + [
+        cols = ['timestamp'] + [
             f'{c}_market_cap' for c in CMC_IDS.keys()
         ]
         merged = merged[cols]

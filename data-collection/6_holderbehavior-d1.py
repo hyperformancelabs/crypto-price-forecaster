@@ -98,17 +98,7 @@ class CoinMetricsFetcher:
                         else:
                             record[metric.lower()] = value
 
-                # Calculate derived holder behavior metrics
-                if 'exchange_inflow_native' in record and 'exchange_outflow_native' in record:
-                    record['net_flow_native'] = record['exchange_inflow_native'] - record['exchange_outflow_native']
-
-                if 'exchange_inflow_usd' in record and 'exchange_outflow_usd' in record:
-                    record['net_flow_usd'] = record['exchange_inflow_usd'] - record['exchange_outflow_usd']
-
-                # Calculate exchange supply percentage (if total supply available)
-                if 'total_supply' in record and 'exchange_supply_native' in record and record['total_supply'] > 0:
-                    record['exchange_supply_pct'] = (record['exchange_supply_native'] / record['total_supply']) * 100
-
+                
                 records.append(record)
 
             df = pd.DataFrame(records)

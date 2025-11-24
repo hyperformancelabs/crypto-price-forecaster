@@ -79,12 +79,7 @@ class CoinMetricsProfitAndValueFetcher:
                         else:
                             record[metric.lower()] = value
 
-                # Calculate derived metrics
-                if 'exchange_inflow_usd' in record and 'exchange_outflow_usd' in record:
-                    record['net_flow_usd'] = record['exchange_inflow_usd'] - record['exchange_outflow_usd']
-                if 'exchange_inflow_native' in record and 'exchange_outflow_native' in record:
-                    record['net_flow_native'] = record['exchange_inflow_native'] - record['exchange_outflow_native']
-
+              
                 records.append(record)
 
             df = pd.DataFrame(records)
@@ -154,97 +149,13 @@ class CoinMetricsProfitAndValueFetcher:
         numeric_cols = df_full.select_dtypes(include=['number']).columns
         df_full[numeric_cols] = df_full[numeric_cols].ffill().fillna(0)
 
-        # Calculate realized price if MVRV and market cap data available
-        # We need to fetch market cap to calculate realized price: Realized Price = Market Cap / MVRV
-        df_full = self.calculate_derived_metrics(df_full, coin)
-
+        
         print(f"\n   ✅ Total: {len(df_full)} daily records")
         print(f"   📅 {df_full['timestamp'].min()} → {df_full['timestamp'].max()}")
 
         return df_full
 
-    def calculate_derived_metrics(self, df, coin):
-        """Calculate derived metrics like Realized Price from available data"""
-
-        # Fetch market cap data to calculate realized price
-        if 'mvrv_ratio' in df.columns and coin in ['BTC', 'ETH']:
-            df_with_realized = self.fetch_market_cap_for_realized_price(df, coin)
-            return df_with_realized
-
-        return df
-
-    def fetch_market_cap_for_realized_price(self, df, coin):
-        """Fetch market cap data to calculate realized price"""
-        print(f"   💰 Fetching market cap data for realized price calculation...")
-
-        try:
-            # Get market cap for the date range
-            start_date = df['timestamp'].min().strftime('%Y-%m-%d')
-            end_date = df['timestamp'].max().strftime('%Y-%m-%d')
-
-            url = f"{self.base_url}/timeseries/asset-metrics"
-            params = {
-                'assets': coin.lower(),
-                'metrics': 'CapMrktCurUSD',
-                'start_time': start_date,
-                'end_time': end_date,
-                'frequency': '1d',
-                'page_size': 10000
-            }
-
-            response = requests.get(url, params=params, timeout=60)
-
-            if response.status_code == 200:
-                data = response.json()
-
-                if 'data' in data and data['data']:
-                    market_cap_data = {}
-                    for item in data['data']:
-                        date = pd.to_datetime(item['time'])
-                        market_cap_data[date] = float(item['CapMrktCurUSD']) if item['CapMrktCurUSD'] else None
-
-                    # Calculate realized price: Realized Price = Market Cap / MVRV
-                    df['realized_price_usd'] = df.apply(
-                        lambda row: self.calculate_realized_price(
-                            row['timestamp'],
-                            row['mvrv_ratio'],
-                            market_cap_data
-                        ),
-                        axis=1
-                    )
-
-                    print(f"   ✅ Realized price calculated for {len(df)} records")
-
-        except Exception as e:
-            print(f"   ⚠️ Could not fetch market cap data: {e}")
-
-        return df
-
-    def calculate_realized_price(self, timestamp, mvrv_ratio, market_cap_data):
-        """Calculate realized price from market cap and MVRV ratio"""
-        try:
-            if pd.isna(mvrv_ratio) or mvrv_ratio <= 0:
-                return None
-
-            # Get market cap for this timestamp (use previous day if exact match not found)
-            market_cap = market_cap_data.get(timestamp)
-            if market_cap is None:
-                # Find closest previous date
-                for date in sorted(market_cap_data.keys(), reverse=True):
-                    if date <= timestamp and market_cap_data[date] is not None:
-                        market_cap = market_cap_data[date]
-                        break
-
-            if market_cap is None or market_cap <= 0:
-                return None
-
-            # Realized Price = Market Cap / MVRV
-            realized_price = market_cap / mvrv_ratio
-            return realized_price
-
-        except Exception:
-            return None
-
+    
     def fetch_all_coins(self):
         """Fetch profit and value data for all configured coins"""
         print(f"\n{'='*60}")
