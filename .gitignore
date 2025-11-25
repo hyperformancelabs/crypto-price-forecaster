@@ -210,3 +210,6 @@ __marimo__/
 data/raw/news/html/*.html
 .claude/
 .mcp.json
+
+# macOS
+*.DS_Store
