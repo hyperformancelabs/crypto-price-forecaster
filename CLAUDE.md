@@ -23,45 +23,45 @@ All settings are centralized in `config.py`:
 ### Data Collection Pipeline
 Eight main data collectors with no confirmation prompts (auto-start):
 
-1. **OHLCV Collector** (`data-collection/1_ohlcv-h4.py`):
+1. **OHLCV Collector** (`collectors/1_ohlcv-h4.py`):
    - Fetches H4 OHLCV data from Binance for BTC/ETH
    - Collects raw price data only (no calculated indicators)
    - Saves to `data/raw/ohlcv/{coin}_h4_ohlcv.csv`
 
-2. **Market Cap Collector** (`data-collection/2_marketcap-h4.py`):
+2. **Market Cap Collector** (`collectors/2_marketcap-h4.py`):
    - Fetches H4 market cap data from CoinMarketCap for BTC, ETH, USDT, USDC
    - Collects individual coin market caps only (no calculated total)
    - Saves to `data/raw/marketcap/market_cap_h4.csv`
 
-3. **Network Activity Collector** (`data-collection/3_networkactivity-d1.py`):
+3. **Network Activity Collector** (`collectors/3_networkactivity-d1.py`):
    - Fetches daily network activity metrics from CoinMetrics for BTC/ETH
    - Collects Active Addresses and Transaction Count
    - Saves to `data/raw/networkactivity/{coin}_networkactivity.csv`
 
-4. **Security and Mining Collector** (`data-collection/4_secureandmining-d1.py`):
+4. **Security and Mining Collector** (`collectors/4_secureandmining-d1.py`):
    - Fetches daily security and mining metrics from Blockchain.info for BTC
    - Collects Hash Rate, Mining Difficulty, and Miner Revenue
    - Saves to `data/raw/secureandmining/BTC_mining_d1.csv`
 
-5. **Profit and Value Collector** (`data-collection/5_profitandvalue-d1.py`):
+5. **Profit and Value Collector** (`collectors/5_profitandvalue-d1.py`):
    - Fetches daily profit and value metrics from CoinMetrics for BTC/ETH
    - Collects MVRV Ratio, Exchange Inflows/Outflows, Exchange Supply (raw API data only)
    - Saves to `data/raw/profitandvalue/{coin}_profitandvalue.csv`
 
-6. **Holder Behavior Collector** (`data-collection/6_holderbehavior-d1.py`):
+6. **Holder Behavior Collector** (`collectors/6_holderbehavior-d1.py`):
    - Fetches daily holder behavior metrics from CoinMetrics for BTC (free tier limitations)
    - Collects Total Supply, MVRV Ratio, Exchange Flows, Exchange Supply (raw API data only)
    - Note: Advanced holder metrics (HODL Waves, Illiquid Supply, CDD, Whale Holdings) require paid APIs
    - Saves to `data/raw/holderbehavior/{coin}_holderbehavior.csv`
 
-7. **Bitcoin Magazine News Scraper** (`data-collection/7_bitcoinmagazinenews-all.py`):
+7. **Bitcoin Magazine News Scraper** (`collectors/7_bitcoinmagazinenews-all.py`):
    - Scrapes all Bitcoin Magazine articles with comprehensive error handling and resume functionality
    - Features: Serial ID tracking, progress bars with tqdm, automatic HTML file naming with article timestamps
    - Robots.txt compliance with bingbot user agent and 3-second delays
    - Saves to `data/raw/news/bitcoinmagazinenews.csv` and `data/raw/news/html/{ID}_{timestamp}.html`
    - **COMPLETED**: 13,391 total articles, 13,391 crawled (100% success), 0 failed, 0 pending
 
-8. **Sentiment Index Collector** (`data-collection/8_sentimentindex-d1.py`):
+8. **Sentiment Index Collector** (`collectors/8_sentimentindex-d1.py`):
    - Fetches Fear & Greed Index data from Alternative.me free API
    - Collects daily sentiment values (0-100 scale) and classification labels
    - Coverage: 2018-present with complete historical data (2,841 daily records)
@@ -124,28 +124,28 @@ Eight main data collectors with no confirmation prompts (auto-start):
 ### Running Data Collection
 ```bash
 # Collect OHLCV data
-python data-collection/1_ohlcv-h4.py
+python collectors/1_ohlcv-h4.py
 
 # Collect market cap data
-python data-collection/2_marketcap-h4.py
+python collectors/2_marketcap-h4.py
 
 # Collect network activity data
-python data-collection/3_networkactivity-d1.py
+python collectors/3_networkactivity-d1.py
 
 # Collect security and mining data
-python data-collection/4_secureandmining-d1.py
+python collectors/4_secureandmining-d1.py
 
 # Collect profit and value data
-python data-collection/5_profitandvalue-d1.py
+python collectors/5_profitandvalue-d1.py
 
 # Collect holder behavior data (BTC only - free tier)
-python data-collection/6_holderbehavior-d1.py
+python collectors/6_holderbehavior-d1.py
 
 # Scrape Bitcoin Magazine news (completed - 13,391 articles)
-python data-collection/7_bitcoinmagazinenews-all.py
+python collectors/7_bitcoinmagazinenews-all.py
 
 # Collect sentiment index data (Fear & Greed)
-python data-collection/8_sentimentindex-d1.py
+python collectors/8_sentimentindex-d1.py
 ```
 
 ### Data Management
