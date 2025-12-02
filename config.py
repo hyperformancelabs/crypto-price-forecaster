@@ -142,3 +142,7 @@ def get_sentimentindex_file() -> str:
 def get_news_file() -> str:
     """Get Bitcoin Magazine news file path (raw data)"""
     return f"{NEWS_DIR}/bitcoinmagazinenews.csv"
+
+def get_master_dataset_file() -> str:
+    """Get master cleaned dataset file path (raw data)"""
+    return f"{RAW_DIR}/master_dataset_h4_v1.csv"

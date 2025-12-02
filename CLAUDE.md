@@ -19,9 +19,10 @@ All settings are centralized in `config.py`:
 - Coin configurations and mappings
 - Utility functions for file path management
 - Automatic directory creation via `ensure_directories()`
+- Master dataset file path management via `get_master_dataset_file()`
 
 ### Data Collection Pipeline
-Eight main data collectors with no confirmation prompts (auto-start):
+Eight main data collectors with no confirmation prompts (auto-start) plus unified dataset processing:
 
 1. **OHLCV Collector** (`collectors/1_ohlcv-h4.py`):
    - Fetches H4 OHLCV data from Binance for BTC/ETH
@@ -68,35 +69,52 @@ Eight main data collectors with no confirmation prompts (auto-start):
    - Saves to `data/raw/sentimentindex/fear_greed_index_d1.csv`
    - **COMPLETED**: 2,841 daily records from 2018-02-01 to 2025-11-15
 
+9. **Master Dataset Processor** (`processors/cleaning.ipynb`):
+   - Unified processing pipeline that combines all 8 data sources into single H4-aligned dataset
+   - Advanced sentiment analysis using CryptoBERT model with 11 distinct sentiment metrics
+   - Column prefixing strategy (BTC_, ETH_) for clear data source identification
+   - H4 time grid alignment with comprehensive validation and forward-fill for missing values
+   - News content extraction and AS-OF timeframe mapping without future leakage
+   - Merges 333,571 rows across 62 columns into production-ready ML dataset
+   - Saves to `data/raw/master_dataset_h4_v1.csv` (84MB unified dataset)
+   - **COMPLETED**: Full H4 coverage from 2009-01-03 to 2025-11-25 with comprehensive sentiment analysis
+
 ### Data Structure
 
 **OHLCV Data Format** (`data/raw/ohlcv/`):
 - Columns: `timestamp, open, high, low, close, volume, quote_volume, trades`
-- Timestamp format: pandas datetime
-- Features: Raw price data only (no calculated indicators)
+- Master Dataset Format: `timestamp, BTC_open, BTC_high, BTC_low, BTC_close, BTC_volume, BTC_quote_volume, BTC_trades, ETH_*` equivalents
+- Timestamp format: pandas datetime aligned to H4 grid (00:00, 04:00, 08:00, 12:00, 16:00, 20:00)
+- Features: Raw price data only (no calculated indicators), with prefixed column names for source identification
 
 **Market Cap Data Format** (`data/raw/marketcap/`):
 - Columns: `timestamp, BTC_market_cap, ETH_market_cap, USDT_market_cap, USDC_market_cap`
+- Master Dataset Format: Same column names with prefixed BTC_, ETH_ for consistency
+- Timestamp format: pandas datetime aligned to H4 grid
 - Features: Individual coin market caps from CoinMarketCap API (no calculated total)
 
 **Network Activity Data Format** (`data/raw/networkactivity/`):
 - Columns: `timestamp, active_addresses, tx_count`
-- Timestamp format: pandas datetime
-- Features: Daily on-chain network metrics for blockchain analysis
+- Master Dataset Format: `timestamp, BTC_active_addresses, BTC_tx_count, ETH_active_addresses, ETH_tx_count`
+- Timestamp format: pandas datetime aligned to H4 grid (interpolated from daily data)
+- Features: Daily on-chain network metrics for blockchain analysis with prefixed column names
 
 **Mining Data Format** (`data/raw/secureandmining/`):
 - Columns: `timestamp, hash_rate_ths, mining_difficulty, miner_revenue_usd`
-- Timestamp format: pandas datetime
+- Master Dataset Format: Same column names without prefix (BTC-specific metrics only)
+- Timestamp format: pandas datetime aligned to H4 grid (interpolated from daily data)
 - Features: Daily mining security metrics for blockchain analysis
 
 **Profit and Value Data Format** (`data/raw/profitandvalue/`):
 - Columns: `timestamp, mvrv_ratio, exchange_inflow_native, exchange_inflow_usd, exchange_outflow_native, exchange_outflow_usd, exchange_supply_native, exchange_supply_usd`
-- Timestamp format: pandas datetime
-- Features: Raw on-chain metrics from CoinMetrics API (no calculated fields)
+- Master Dataset Format: `timestamp, BTC_mvrv_ratio, BTC_exchange_inflow_native, BTC_exchange_inflow_usd, BTC_exchange_outflow_native, BTC_exchange_outflow_usd, BTC_exchange_supply_native, BTC_exchange_supply_usd, ETH_*` equivalents
+- Timestamp format: pandas datetime aligned to H4 grid (interpolated from daily data)
+- Features: Raw on-chain metrics from CoinMetrics API with prefixed column names (no calculated fields)
 
 **Holder Behavior Data Format** (`data/raw/holderbehavior/`):
 - Columns: `timestamp, total_supply, mvrv_ratio, exchange_inflow_native, exchange_inflow_usd, exchange_outflow_native, exchange_outflow_usd, exchange_supply_native, exchange_supply_usd`
-- Timestamp format: pandas datetime
+- Master Dataset Format: Same column names without prefix (BTC-specific metrics only, following legacy naming)
+- Timestamp format: pandas datetime aligned to H4 grid (interpolated from daily data)
 - Features: Raw BTC holder behavior metrics from CoinMetrics API (no calculated fields)
 
 **Bitcoin Magazine News Data Format** (`data/raw/news/`):
@@ -126,6 +144,21 @@ Eight main data collectors with no confirmation prompts (auto-start):
 - **Source**: Alternative.me Fear & Greed Index API
 - **Distribution**: Fear (819 days), Greed (789 days), Extreme Fear (564 days), Neutral (388 days), Extreme Greed (281 days)
 
+**Master Dataset Format** (`data/raw/master_dataset_h4_v1.csv`):
+- **Size**: 84MB, 333,571 rows with complete H4 coverage from 2009-01-03 to 2025-11-25
+- **Timestamp**: UTC datetime aligned to 4-hour grid (00:00, 04:00, 08:00, 12:00, 16:00, 20:00)
+- **Structure**: 62 columns organized across 9 data categories with prefixed naming convention
+- **Price Data (8 columns)**: `BTC_open`, `BTC_high`, `BTC_low`, `BTC_close`, `BTC_volume`, `BTC_quote_volume`, `BTC_trades`, `ETH_*` equivalents
+- **Market Cap Data (4 columns)**: `BTC_market_cap`, `ETH_market_cap`, `USDT_market_cap`, `USDC_market_cap`
+- **Network Activity Data (4 columns)**: `BTC_active_addresses`, `BTC_tx_count`, `ETH_active_addresses`, `ETH_tx_count`
+- **Mining Metrics (3 columns)**: `mining_difficulty`, `hash_rate_ths`, `miner_revenue_usd`
+- **Profit and Value Data (14 columns)**: `BTC_mvrv_ratio`, `BTC_exchange_inflow_native`, `BTC_exchange_inflow_usd`, `BTC_exchange_outflow_native`, `BTC_exchange_outflow_usd`, `BTC_exchange_supply_native`, `BTC_exchange_supply_usd`, `ETH_*` equivalents
+- **Holder Behavior Data (8 columns)**: `total_supply`, `mvrv_ratio`, `exchange_inflow_native`, `exchange_inflow_usd`, `exchange_outflow_native`, `exchange_outflow_usd`, `exchange_supply_native`, `exchange_supply_usd`
+- **Sentiment Index Data (2 columns)**: `value`, `classification` (Fear & Greed Index)
+- **News Processing Data (12 columns)**: `merged_content`, `news_article_count`, `news_log_article_count`, `has_news`, `news_head_sent_net_mean`, `news_global_sent_net_mean`, `news_head_sent_net_max`, `news_head_sent_net_min`, `news_head_sent_net_std`, `news_max_bull_prob`, `news_max_bear_prob`, `original_ids`
+- **Column Naming**: All data source columns use prefixes (BTC_, ETH_) to prevent conflicts and enable clear source identification
+- **Data Quality**: Comprehensive H4 grid alignment with forward-fill for missing values, automatic duplicate removal, and cross-source validation
+
 ## Common Development Commands
 
 ### Running Data Collection
@@ -153,6 +186,32 @@ python collectors/7_bitcoinmagazinenews-all.py
 
 # Collect sentiment index data (Fear & Greed)
 python collectors/8_sentimentindex-d1.py
+
+# Process master dataset (unified H4-aligned dataset with sentiment analysis)
+jupyter lab processors/cleaning.ipynb
+```
+
+### Data Processing Commands
+```bash
+# Run the complete cleaning and processing pipeline
+jupyter lab processors/cleaning.ipynb
+# Follow the notebook cells sequentially for:
+# - Data loading and validation
+# - H4 grid alignment and interpolation
+# - News content extraction and sentiment analysis
+# - Column prefixing and data merging
+# - Master dataset export and validation
+
+# Validate the master dataset
+python -c "
+import pandas as pd
+df = pd.read_csv('data/raw/master_dataset_h4_v1.csv')
+print(f'Master Dataset Shape: {df.shape}')
+print(f'Columns: {list(df.columns)}')
+print(f'Time Range: {df.timestamp.min()} to {df.timestamp.max()}')
+print(f'Missing Values: {df.isnull().sum().sum()}')
+print(f'H4 Grid Coverage: {df.shape[0]} rows')
+"
 ```
 
 ### Data Management
@@ -176,6 +235,11 @@ head data/raw/profitandvalue/BTC_profitandvalue.csv
 head data/raw/holderbehavior/BTC_holderbehavior.csv
 head data/raw/news/bitcoinmagazinenews.csv
 head data/raw/sentimentindex/fear_greed_index_d1.csv
+
+# View master dataset sample and statistics
+head data/raw/master_dataset_h4_v1.csv
+wc -l data/raw/master_dataset_h4_v1.csv
+ls -lh data/raw/master_dataset_h4_v1.csv
 ```
 
 ## Important Configuration Details
@@ -232,13 +296,25 @@ All 8 collectors use authoritative, legitimate sources:
 - **No confirmation prompts**: All collectors start automatically
 - **Production-ready data structure**: Clean separation of raw data by type
 - **Modular design**: Each collector is self-contained with clear responsibilities
-- **Error handling**: Graceful error handling with retry logic
+- **Unified processing**: Master dataset processor integrates all sources into single H4-aligned dataset
+- **Column prefixing**: Systematic BTC_/ETH_ naming for clear source identification
+- **Error handling**: Graceful error handling with retry logic and comprehensive validation
 
 ### Data Quality
 - Automatic data validation during collection
 - Forward-fill missing values in time series
 - Duplicate timestamp removal
-- Consistent column naming across datasets
+- Consistent column naming across datasets with prefixed source identification
+- H4 grid alignment with comprehensive interpolation and validation
+- Cross-source data integrity verification and gap analysis
+
+### ML Integration Architecture
+- **Production-ready pipeline**: End-to-end processing from raw collection to ML-ready dataset
+- **Advanced sentiment features**: 11 distinct CryptoBERT sentiment metrics for market psychology analysis
+- **Time-aligned features**: All data sources synchronized to H4 grid for model training
+- **Feature engineering**: Log transformations, binary indicators, and aggregated statistics
+- **Sparse data handling**: Comprehensive missing value strategies and validation
+- **Memory efficiency**: Optimized processing for large datasets (84MB, 333K+ rows)
 
 ### Data Processing Pipeline
 
@@ -447,6 +523,96 @@ Sentiment index data complements price and market data by:
 - **56-75**: Greed (distribution phase)
 - **76-100**: Extreme Greed (historical selling opportunities)
 
+## Enhanced Sentiment Analysis
+
+### CryptoBERT Integration
+The master dataset processor includes advanced sentiment analysis using cryptocurrency-specific models:
+
+#### **Model Specifications**
+- **Primary Model**: `ElKulako/cryptobert` - Fine-tuned BERT model for cryptocurrency sentiment analysis
+- **Training Domain**: Specialized on cryptocurrency news, social media, and market discussions
+- **Output Classes**: Bullish, Neutral, Bearish sentiment probabilities
+- **Device Support**: Automatic GPU/CPU detection with adaptive batch sizes (GPU: 32, CPU: 8)
+
+#### **Multi-dimensional Analysis Strategy**
+- **Head Analysis**: First 1000 characters (title + introduction) for immediate market reaction signals
+- **Global Analysis**: Entire article content processed in 256-token chunks with 48-token overlap
+- **Maximum Detection**: Peak sentiment intensity identification across all chunks
+- **Top-K Analysis**: Mean of top-3 most bullish/bearish passages for sentiment extremes
+
+#### **Sentiment Metrics Pipeline**
+1. **Content Extraction**: Sophisticated HTML parsing with junk removal and metadata extraction
+2. **Chunking Strategy**: Long articles divided into manageable 256-token chunks with overlap
+3. **Batch Processing**: Configurable GPU/CPU batch sizes with rate limiting and retry logic
+4. **Probabilistic Scoring**: 11 distinct sentiment metrics per article:
+   - **Head Sentiment**: `head_p_bull, head_p_neu, head_p_bear, head_sent_net`
+   - **Global Sentiment**: `mean_p_bull, mean_p_neu, mean_p_bear, global_sent_net`
+   - **Maximum Sentiment**: `max_p_bull, max_p_neu, max_p_bear`
+   - **Top-K Sentiment**: `topk_mean_p_bull, topk_mean_p_bear`
+
+#### **Market Psychology Applications**
+- **High Head Bullish**: Immediate positive market sentiment indicators for short-term signals
+- **High Global Bearish**: Extended negative sentiment warnings for medium-term outlooks
+- **Top-K Imbalance**: Strong directional sentiment from key passages for trading opportunities
+- **Cross-timeframe Analysis**: Sentiment trends across different horizons for comprehensive market assessment
+
+#### **Time Series Integration**
+- **AS-OF H4 Mapping**: News mapped to actionable 4-hour candle times without future leakage
+- **Aggregated Features**: Mean, max, min, std sentiment metrics per H4 timeframe
+- **Log-transformed Counts**: News intensity features with `log(article_count + 1)`
+- **Binary Indicators**: `has_news` flags for sparse news periods
+- **Extreme Probability Tracking**: Maximum bullish/bearish probabilities per timeframe
+
+### Data Processing Pipeline
+
+#### **Unified Workflow Architecture**
+The master dataset processor implements a comprehensive data unification pipeline:
+
+#### **Phase 1: Data Ingestion and Validation**
+1. **Multi-source Loading**: Concurrent loading of all 8 raw data sources
+2. **Schema Validation**: Automatic column type checking and format standardization
+3. **Timestamp Normalization**: ISO 8601 parsing with microsecond cleanup and UTC conversion
+4. **Quality Checks**: Duplicate detection, missing value analysis, and data integrity validation
+
+#### **Phase 2: H4 Grid Alignment**
+1. **Time Grid Creation**: Complete 4-hour timestamp grid from 2009-01-03 to present
+2. **Interpolation Strategy**: Daily data interpolated to H4 with appropriate methods
+3. **Forward Fill Application**: Missing values filled using time-appropriate strategies
+4. **Gap Analysis**: Identification and documentation of data coverage gaps
+5. **Validation**: Complete H4 grid coverage with comprehensive alignment checks
+
+#### **Phase 3: Column Prefixing and Organization**
+1. **Source Identification**: Automatic detection of data source type and cryptocurrency
+2. **Prefix Application**: Systematic BTC_/ETH_ prefixing for column name consistency
+3. **Schema Consolidation**: 62-column unified structure with clear data source provenance
+4. **Naming Convention**: Standardized column naming following master dataset specification
+5. **Legacy Compatibility**: Maintained backward compatibility with original column names where needed
+
+#### **Phase 4: Advanced News Processing**
+1. **HTML Content Extraction**: Sophisticated parsing with multiple layout support
+2. **Content Cleaning**: Junk removal, promotional content filtering, and text normalization
+3. **Metadata Extraction**: Author, date, tags, title extraction with error handling
+4. **Sentiment Analysis**: Multi-dimensional CryptoBERT processing with configurable parameters
+5. **Time Mapping**: AS-OF H4 timeframe mapping preventing future data leakage
+
+#### **Phase 5: Integration and Export**
+1. **Data Merging**: Left join of all sources to H4 grid with comprehensive validation
+2. **Feature Engineering**: Log transformations, binary indicators, and aggregated statistics
+3. **Quality Assurance**: Final validation checks and data integrity verification
+4. **Export Generation**: Production-ready CSV with complete metadata and documentation
+
+#### **Error Handling and Recovery**
+- **Resilient Processing**: Graceful handling of malformed data, missing files, and API failures
+- **Retry Logic**: Configurable retry strategies with exponential backoff
+- **Progress Tracking**: Comprehensive logging and progress reporting for long-running operations
+- **Validation Checks**: Multi-level validation with detailed error reporting and recovery suggestions
+
+#### **Performance Optimizations**
+- **Memory Management**: Efficient chunked processing for large datasets
+- **Parallel Processing**: Concurrent data loading and processing where appropriate
+- **Batch Operations**: Optimized batch sizes for both GPU and CPU inference
+- **Caching**: Intelligent caching of intermediate results to avoid redundant processing
+
 ## Extension Points
 
 ### Adding New Coins
@@ -463,3 +629,22 @@ Sentiment index data complements price and market data by:
 1. Add API configuration to `config.py`
 2. Create new collector following existing patterns
 3. Use `ensure_directories()` and path utility functions
+4. Follow column naming conventions with cryptocurrency prefixes (BTC_, ETH_)
+
+### Column Naming Conventions
+When adding new data sources to the master dataset:
+- **Use Prefixes**: Apply cryptocurrency prefixes (BTC_, ETH_) to all column names
+- **Snake Case**: Use underscores for multi-word column names (e.g., `exchange_inflow_native`)
+- **Source Identification**: Include data source in column names where appropriate
+- **Consistency**: Follow existing patterns from similar data sources
+- **Avoid Conflicts**: Ensure unique column names across all data sources
+- **Master Dataset Integration**: Consider H4 grid alignment and interpolation requirements
+
+### Master Dataset Integration
+When extending the master dataset with new data sources:
+1. **Raw Data Collection**: Add new collector following existing 8-collector pattern
+2. **Column Prefixing**: Apply systematic naming with cryptocurrency prefixes
+3. **H4 Alignment**: Implement time grid alignment and interpolation as needed
+4. **Validation**: Add data quality checks and validation in processing pipeline
+5. **Documentation**: Update Data Structure section with new format specifications
+6. **Testing**: Validate integration with existing master dataset structure
