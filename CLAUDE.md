@@ -233,6 +233,36 @@ All 8 collectors use authoritative, legitimate sources:
 - Duplicate timestamp removal
 - Consistent column naming across datasets
 
+### Data Processing Pipeline
+
+The `processors/cleaning.ipynb` provides comprehensive data processing capabilities:
+
+#### HTML Content Extraction
+- **Article Parser**: Extracts structured content from Bitcoin Magazine HTML files
+- **Content Cleaning**: Removes junk elements, promotional content, and formatting artifacts
+- **Metadata Extraction**: Retrieves title, author, date, tags, and publication metadata
+- **Error Handling**: Graceful handling of malformed HTML and missing files
+
+#### Sentiment Analysis with CryptoBERT
+- **Model**: Uses `ElKulako/cryptobert` for cryptocurrency-specific sentiment analysis
+- **Chunking Strategy**: Divides long articles into 256-token chunks with 48-token overlap
+- **Multiple Features**: Head sentiment, global sentiment, top-k bullish/bearish scores
+- **Sentiment Metrics**: Bullish/Neutral/Bearish probabilities, net sentiment scores
+- **API Integration**: HuggingFace Inference Client with rate limiting and retry logic
+
+#### Time Series Processing
+- **Timestamp Normalization**: Converts various timestamp formats to UTC with configurable rounding
+- **Actionable Time Mapping**: Maps news to next actionable candle times (supports m/h/d/w/M)
+- **Content Merging**: Combines multiple articles into structured LLM-ready format
+- **DataFrame Operations**: Group by timeframe, merge content, count articles
+
+### ML Integration Features
+- **News Sentiment**: Ready-to-use sentiment scores for each article
+- **Time Series Alignment**: News grouped by actionable timeframes for model training
+- **Feature Engineering**: Multiple sentiment dimensions (head, global, max, top-k)
+- **Comprehensive Coverage**: Dataset spans 2012-2025 with 13,391 articles
+- **Clean Format**: TSV-separated cleaned data with proper type handling
+
 ### Current Data Assets
 - BTC H4 OHLCV: ~18K records (1.9MB)
 - ETH H4 OHLCV: ~18K records (1.8MB)

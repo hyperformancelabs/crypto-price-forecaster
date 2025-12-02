@@ -23,26 +23,31 @@ import xml.etree.ElementTree as ET
 from datetime import datetime, timezone
 from urllib.parse import urljoin, urlparse
 from pathlib import Path
-from typing import List, Dict, Optional, Set
 import signal
 from tqdm import tqdm
 
-# Configuration - using project structure
-BASE_URL = "https://bitcoinmagazine.com"
-USER_AGENT = "Mozilla/5.0 (compatible; bingbot/2.0; +http://www.bing.com/bingbot.htm)"
-REQUEST_TIMEOUT = 60
-MAX_RETRIES = 5
-RETRY_DELAY = 5
-CRAWL_DELAY = 1
+# Import project configuration
+sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+from config import (
+    NEWS_DIR, NEWS_RATE_LIMIT, NEWS_USER_AGENT, NEWS_MAX_RETRIES,
+    ensure_directories, get_news_file
+)
 
-# Directory paths
-DATA_DIR = Path("data/raw/news")
-HTML_DIR = DATA_DIR / "html"
-MASTER_CSV = DATA_DIR / "bitcoinmagazinenews.csv"
+# Configuration - using centralized config
+BASE_URL = "https://bitcoinmagazine.com"
+USER_AGENT = NEWS_USER_AGENT
+REQUEST_TIMEOUT = 60
+MAX_RETRIES = NEWS_MAX_RETRIES
+RETRY_DELAY = 5
+CRAWL_DELAY = NEWS_RATE_LIMIT
+
+# Directory paths - using centralized config
+DATA_DIR = Path(NEWS_DIR)
+HTML_DIR = Path(f"{NEWS_DIR}/html")
+MASTER_CSV = Path(get_news_file())
 
 # Ensure directories exist
-DATA_DIR.mkdir(parents=True, exist_ok=True)
-HTML_DIR.mkdir(exist_ok=True)
+ensure_directories()
 
 def load_master_csv():
     """Load existing master CSV and return article data"""
@@ -142,7 +147,7 @@ def parse_sitemap_index():
 
         for sitemap in root.findall('.//ns:sitemap', namespace):
             loc = sitemap.find('ns:loc', namespace)
-            if loc is not None:
+            if loc is not None and loc.text is not None:
                 sitemap_url = loc.text
                 if 'post-sitemap' in sitemap_url or 'news-sitemap' in sitemap_url:
                     sitemaps.append(sitemap_url)

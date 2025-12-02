@@ -16,6 +16,7 @@ SECUREANDMINING_DIR = f"{RAW_DIR}/secureandmining"
 PROFITANDVALUE_DIR = f"{RAW_DIR}/profitandvalue"
 HOLDERBEHAVIOR_DIR = f"{RAW_DIR}/holderbehavior"
 SENTIMENTINDEX_DIR = f"{RAW_DIR}/sentimentindex"
+NEWS_DIR = f"{RAW_DIR}/news"
 
 # API endpoints
 BINANCE_BASE_URL = "https://api.binance.com/api/v3"
@@ -86,6 +87,11 @@ HOLDERBEHAVIOR_CHUNK_DAYS = 365
 # Sentiment Index API parameters
 SENTIMENTINDEX_RATE_LIMIT = 3600  # Alternative.me: 1 request per hour (respectful limit)
 
+# News API parameters
+NEWS_RATE_LIMIT = 3  # Bitcoin Magazine: 3 seconds delay between requests
+NEWS_USER_AGENT = "bingbot"  # User agent for web scraping
+NEWS_MAX_RETRIES = 3  # Maximum retry attempts for failed requests
+
 # Timeframes for aggregation
 AGGREGATION_TIMEFRAMES = {
     'D': '1d',
@@ -98,7 +104,7 @@ AGGREGATION_TIMEFRAMES = {
 def ensure_directories():
     """Create necessary directories if they don't exist"""
     directories = [
-        DATA_DIR, RAW_DIR, OHLCV_DIR, MARKETCAP_DIR, NETWORKACTIVITY_DIR, SECUREANDMINING_DIR, PROFITANDVALUE_DIR, HOLDERBEHAVIOR_DIR, SENTIMENTINDEX_DIR
+        DATA_DIR, RAW_DIR, OHLCV_DIR, MARKETCAP_DIR, NETWORKACTIVITY_DIR, SECUREANDMINING_DIR, PROFITANDVALUE_DIR, HOLDERBEHAVIOR_DIR, SENTIMENTINDEX_DIR, NEWS_DIR, f"{NEWS_DIR}/html"
     ]
     for directory in directories:
         if not os.path.exists(directory):
@@ -132,3 +138,7 @@ def get_holderbehavior_file(coin: str) -> str:
 def get_sentimentindex_file() -> str:
     """Get sentiment index file path (raw data)"""
     return f"{SENTIMENTINDEX_DIR}/fear_greed_index_d1.csv"
+
+def get_news_file() -> str:
+    """Get Bitcoin Magazine news file path (raw data)"""
+    return f"{NEWS_DIR}/bitcoinmagazinenews.csv"
