@@ -100,15 +100,22 @@ Eight main data collectors with no confirmation prompts (auto-start):
 - Features: Raw BTC holder behavior metrics from CoinMetrics API (no calculated fields)
 
 **Bitcoin Magazine News Data Format** (`data/raw/news/`):
-- **CSV Format**: `id, datetime, url, status` (13,391 articles)
+- **Base CSV Format**: `bitcoinmagazinenews_crawl.csv` with `id, datetime, url, status` (13,391 articles)
   - `id`: Serial number (1-13391)
   - `datetime`: Article publication time (ISO format)
   - `url`: Full article URL
   - `status`: All articles completed (status=1)
+- **Enhanced CSV Format**: `bitcoinmagazinenews_extract.csv` with comprehensive sentiment analysis (22 columns, 13,391 articles)
+  - **Core Metadata**: `author, content, date, id, status, tags, timestamp, title, url`
+  - **Head Sentiment**: `head_p_bull, head_p_neu, head_p_bear, head_sent_net` - First 1000 characters sentiment probabilities and net score
+  - **Global Sentiment**: `mean_p_bull, mean_p_neu, mean_p_bear, global_sent_net` - Full article sentiment probabilities and net score
+  - **Maximum Sentiment**: `max_p_bull, max_p_neu, max_p_bear` - Maximum sentiment probabilities across all chunks
+  - **Top-K Sentiment**: `topk_mean_p_bull, topk_mean_p_bear` - Mean of top-3 most bullish/bearish chunks
 - **HTML Files**: `data/raw/news/html/{ID}_{YYYYMMDD_HHMMSS}.html`
   - Named by article ID and publication timestamp
   - Perfect synchronization between CSV and actual files
   - 13,391 HTML files (100% complete coverage)
+  - **Data Quality**: 85 articles removed during processing (0.63% cleanup rate)
 
 **Sentiment Index Data Format** (`data/raw/sentimentindex/`):
 - **Columns**: `timestamp, value, classification` (2,841 daily records)
@@ -245,10 +252,23 @@ The `processors/cleaning.ipynb` provides comprehensive data processing capabilit
 
 #### Sentiment Analysis with CryptoBERT
 - **Model**: Uses `ElKulako/cryptobert` for cryptocurrency-specific sentiment analysis
-- **Chunking Strategy**: Divides long articles into 256-token chunks with 48-token overlap
-- **Multiple Features**: Head sentiment, global sentiment, top-k bullish/bearish scores
-- **Sentiment Metrics**: Bullish/Neutral/Bearish probabilities, net sentiment scores
-- **API Integration**: HuggingFace Inference Client with rate limiting and retry logic
+- **Chunking Strategy**: Divides long articles into 256-token chunks with 48-token overlap for comprehensive analysis
+- **Multi-perspective Analysis**:
+  - **Head Analysis**: First 1000 characters (title + introduction) for immediate sentiment signals
+  - **Global Analysis**: Entire article content for comprehensive sentiment assessment
+  - **Top-K Analysis**: Mean of top-3 most bullish/bearish chunks for sentiment intensity
+- **Device Support**:
+  - **GPU Inference**: Local processing with configurable batch sizes (default: 32)
+  - **API Inference**: HuggingFace Inference Client for CPU processing (default: 8)
+  - **Automatic Selection**: Falls back to API if GPU unavailable
+- **Batch Processing**: Configurable GPU/CPU batch sizes with rate limiting and retry logic
+- **Output Metrics**: 11 sentiment columns with probabilistic scores:
+  - **Head Sentiment**: `head_p_bull, head_p_neu, head_p_bear, head_sent_net`
+  - **Global Sentiment**: `mean_p_bull, mean_p_neu, mean_p_bear, global_sent_net`
+  - **Maximum Sentiment**: `max_p_bull, max_p_neu, max_p_bear`
+  - **Top-K Sentiment**: `topk_mean_p_bull, topk_mean_p_bear`
+- **Configuration**: Chunk size, overlap, max chunks, and batch sizes are fully configurable
+- **Performance**: Optimized for processing large article collections with memory-efficient chunking
 
 #### Time Series Processing
 - **Timestamp Normalization**: Converts various timestamp formats to UTC with configurable rounding
@@ -257,11 +277,21 @@ The `processors/cleaning.ipynb` provides comprehensive data processing capabilit
 - **DataFrame Operations**: Group by timeframe, merge content, count articles
 
 ### ML Integration Features
-- **News Sentiment**: Ready-to-use sentiment scores for each article
+- **CryptoBERT News Sentiment**: Cryptocurrency-specific sentiment analysis with 11 distinct metrics
 - **Time Series Alignment**: News grouped by actionable timeframes for model training
-- **Feature Engineering**: Multiple sentiment dimensions (head, global, max, top-k)
+- **Advanced Feature Engineering**: Multiple sentiment dimensions for comprehensive analysis:
+  - **Head Sentiment**: Immediate market reaction signals from article introduction
+  - **Global Sentiment**: Comprehensive article sentiment assessment
+  - **Maximum Sentiment**: Peak sentiment intensity detection across all chunks
+  - **Top-K Sentiment**: Most extreme bullish/bearish passage identification
+  - **Net Sentiment Scores**: Bullish minus Bearish probability differences
+- **Sentiment-Based Trading Signals**: Market psychology indicators for ML models:
+  - **High Head Bullish**: Immediate positive market sentiment indicators
+  - **High Global Bearish**: Extended negative sentiment warnings
+  - **Top-K Imbalance**: Strong directional sentiment from key passages
 - **Comprehensive Coverage**: Dataset spans 2012-2025 with 13,391 articles
-- **Clean Format**: TSV-separated cleaned data with proper type handling
+- **ML-Ready Format**: TSV-separated cleaned data with proper type handling and sentiment probabilities
+- **Multi-Resolution Analysis**: Sentiment features available at chunk-level, article-level, and aggregate timeframe levels
 
 ### Current Data Assets
 - BTC H4 OHLCV: ~18K records (1.9MB)
@@ -273,7 +303,11 @@ The `processors/cleaning.ipynb` provides comprehensive data processing capabilit
 - BTC Daily Profit and Value: ~6.2K records (1.1MB)
 - ETH Daily Profit and Value: ~3.8K records (0.8MB)
 - BTC Daily Holder Behavior: ~6.2K records (1.2MB)
-- Bitcoin Magazine News: 13,391 complete articles (CSV + HTML files)
+- Bitcoin Magazine News Base: 13,391 articles (4-column crawl format, CSV + HTML files)
+- Bitcoin Magazine News Enhanced: 13,391 articles with comprehensive sentiment analysis (22 columns, 2.7MB)
+  - **11 Sentiment Metrics**: Head, global, maximum, and top-K sentiment probabilities per article
+  - **ML-Ready Format**: Structured sentiment scores for cryptocurrency market analysis
+  - **Time Coverage**: 2012-2025 with complete chronological sentiment tracking
 - Fear & Greed Daily Sentiment: 2,841 records (200KB)
 
 ## Network Activity Metrics
