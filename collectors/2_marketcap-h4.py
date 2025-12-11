@@ -10,18 +10,27 @@ sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from config import (
     CMC_IDS, CMC_API_BASE, DEFAULT_TIMEFRAME,
-    CHUNK_DAYS, RATE_LIMIT_DELAY, REQUEST_DELAY, ensure_directories, get_marketcap_file
+    CHUNK_DAYS, RATE_LIMIT_DELAY, REQUEST_DELAY, ensure_directories, get_marketcap_file,
+    END_TIME
 )
 
 import requests
 import pandas as pd
 import time
 from datetime import datetime, timedelta
+from utils.time_utils import calculate_collection_range, format_time_range_for_display, merge_dataframes, parse_end_time
+import os
 
 
 class MarketCapH4Fetcher:
-    def __init__(self):
+    def __init__(self, end_time=None):
         self.base_url = CMC_API_BASE
+
+        # Use config default if not provided
+        if end_time is None:
+            end_time = END_TIME
+
+        self.end_time_config = end_time
         ensure_directories()
 
     def fetch_h4_data(self, coin_id, coin_name, start_date, end_date):
@@ -74,14 +83,28 @@ class MarketCapH4Fetcher:
             print(f"  ❌ Error: {e}")
             return pd.DataFrame()
 
-    def fetch_coin_alltime(self, coin_name, coin_id, start_date=None):
-        if start_date is None:
-            start_date = datetime(2013, 4, 28)
+    def fetch_coin_data(self, coin_name, coin_id):
+        """
+        Fetch market cap data for a coin based on collection configuration
 
-        end_date = datetime.now()
+        Args:
+            coin_name: Name of the coin (e.g., 'BTC')
+            coin_id: CoinMarketCap ID for the coin
+
+        Returns:
+            DataFrame with market cap data
+        """
+        # Calculate time range
+        file_path = get_marketcap_file()
+        start_date, end_date = calculate_collection_range(
+            self.end_time_config,
+            data_type='market_cap',
+            coin=coin_name,
+            file_path=file_path
+        )
 
         print(f"\n📊 Fetching {coin_name} (ID: {coin_id})")
-        print(f"   Range: {start_date.date()} → {end_date.date()}")
+        print(f"   Range: {format_time_range_for_display(start_date, end_date)}")
 
         all_data = []
         current_start = start_date
@@ -123,12 +146,13 @@ class MarketCapH4Fetcher:
     def fetch_all_coins(self):
         print(f"\n{'='*60}")
         print(f"FETCH MARKET CAP H4 DATA")
+        print(f"End Time: {self.end_time_config}")
         print(f"{'='*60}")
 
         all_data = {}
 
         for coin_name, coin_id in CMC_IDS.items():
-            df = self.fetch_coin_alltime(coin_name, coin_id)
+            df = self.fetch_coin_data(coin_name, coin_id)
 
             if not df.empty:
                 all_data[coin_name] = df
@@ -139,21 +163,69 @@ class MarketCapH4Fetcher:
             print("\n❌ No data collected!")
             return None
 
-        print(f"\n{'='*60}")
-        print(f"MERGING DATA")
-        print(f"{'='*60}\n")
+        # Merge with existing data if file exists
+        file_path = get_marketcap_file()
+        if os.path.exists(file_path):
+            try:
+                existing_df = pd.read_csv(file_path)
+                existing_df['timestamp'] = pd.to_datetime(existing_df['timestamp'])
 
-        print("🔗 Merging all market cap columns...")
+                print(f"\n{'='*60}")
+                print(f"MERGING WITH EXISTING DATA")
+                print(f"{'='*60}")
 
-        merged = list(all_data.values())[0][['timestamp']].copy()
+                # Start with existing data
+                merged = existing_df.copy()
 
-        for coin_name, df in all_data.items():
-            merged = pd.merge(
-                merged,
-                df[['timestamp', f'{coin_name}_market_cap']],
-                on='timestamp',
-                how='outer'
-            )
+                # Add new data for each coin
+                for coin_name, df in all_data.items():
+                    if f'{coin_name}_market_cap' in merged.columns:
+                        # Merge new data with existing data for this coin
+                        merged = merged.drop(columns=[f'{coin_name}_market_cap'])
+                        merged = pd.merge(
+                            merged,
+                            df[['timestamp', f'{coin_name}_market_cap']],
+                            on='timestamp',
+                            how='outer'
+                        )
+                    else:
+                        # Add new column
+                        merged = pd.merge(
+                            merged,
+                            df[['timestamp', f'{coin_name}_market_cap']],
+                            on='timestamp',
+                            how='outer'
+                        )
+
+                print(f"Merged with existing {len(existing_df)} records")
+            except Exception as e:
+                print(f"Warning: Could not merge with existing data: {e}")
+                # Fall back to creating new merged dataset
+                merged = list(all_data.values())[0][['timestamp']].copy()
+
+                for coin_name, df in all_data.items():
+                    merged = pd.merge(
+                        merged,
+                        df[['timestamp', f'{coin_name}_market_cap']],
+                        on='timestamp',
+                        how='outer'
+                    )
+        else:
+            # Create new merged dataset
+            print(f"\n{'='*60}")
+            print(f"MERGING DATA")
+            print(f"{'='*60}\n")
+
+            print("🔗 Merging all market cap columns...")
+            merged = list(all_data.values())[0][['timestamp']].copy()
+
+            for coin_name, df in all_data.items():
+                merged = pd.merge(
+                    merged,
+                    df[['timestamp', f'{coin_name}_market_cap']],
+                    on='timestamp',
+                    how='outer'
+                )
 
         merged = merged.sort_values('timestamp').reset_index(drop=True)
         merged = merged.ffill().fillna(0)
@@ -162,6 +234,10 @@ class MarketCapH4Fetcher:
             f'{c}_market_cap' for c in CMC_IDS.keys()
         ]
         merged = merged[cols]
+
+        # Apply END_TIME filtering to final merged dataset
+        end_time = parse_end_time(self.end_time_config)
+        merged = merged[merged['timestamp'] <= end_time]
 
         print(f"✅ Merged dataset:")
         print(f"   Rows: {len(merged):,} H4 candles")

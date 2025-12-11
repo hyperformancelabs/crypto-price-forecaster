@@ -15,11 +15,13 @@ Crypto Price Forecaster is a cryptocurrency data collection and preprocessing sy
 ### Configuration System
 All settings are centralized in `config.py`:
 - API endpoints and rate limiting parameters
-- Data directory structure management
+- Data directory structure management (raw and processed data directories)
 - Coin configurations and mappings
 - Utility functions for file path management
 - Automatic directory creation via `ensure_directories()`
 - Master dataset file path management via `get_master_dataset_file()`
+- Cleaned dataset file path management via `get_cleaned_dataset_file()`
+- **Configurable Time Collection**: Single END_TIME variable with hour-level precision support
 
 ### Data Collection Pipeline
 Eight main data collectors with no confirmation prompts (auto-start) plus unified dataset processing:
@@ -65,9 +67,10 @@ Eight main data collectors with no confirmation prompts (auto-start) plus unifie
 8. **Sentiment Index Collector** (`collectors/8_sentimentindex-d1.py`):
    - Fetches Fear & Greed Index data from Alternative.me free API
    - Collects daily sentiment values (0-100 scale) and classification labels
-   - Coverage: 2018-present with complete historical data (2,841 daily records)
+   - Coverage: 2018-present with complete historical data (2,867 daily records)
    - Saves to `data/raw/sentimentindex/fear_greed_index_d1.csv`
-   - **COMPLETED**: 2,841 daily records from 2018-02-01 to 2025-11-15
+   - **COMPLETED**: 2,867 daily records from 2018-02-01 to 2025-12-11
+   - **Updated**: Fixed data preservation logic to maintain complete historical dataset during incremental updates
 
 9. **Master Dataset Processor** (`processors/cleaning.ipynb`):
    - Unified processing pipeline that combines all 8 data sources into single H4-aligned dataset
@@ -78,6 +81,13 @@ Eight main data collectors with no confirmation prompts (auto-start) plus unifie
    - Merges 333,571 rows across 62 columns into production-ready ML dataset
    - Saves to `data/raw/master_dataset_h4_v1.csv` (84MB unified dataset)
    - **COMPLETED**: Full H4 coverage from 2009-01-03 to 2025-11-25 with comprehensive sentiment analysis
+
+10. **Data Cleaning and Processing** (`processors/cleaning.ipynb`):
+    - Additional data cleaning and processing pipeline for production-ready dataset
+    - Processes raw master dataset into cleaned format optimized for ML pipelines
+    - Data quality improvements and feature engineering
+    - Saves to `data/processed/master_dataset_h4_cleaned_v1.csv` (14MB cleaned dataset)
+    - **COMPLETED**: Cleaned dataset ready for machine learning applications
 
 ### Data Structure
 
@@ -136,13 +146,14 @@ Eight main data collectors with no confirmation prompts (auto-start) plus unifie
   - **Data Quality**: 85 articles removed during processing (0.63% cleanup rate)
 
 **Sentiment Index Data Format** (`data/raw/sentimentindex/`):
-- **Columns**: `timestamp, value, classification` (2,841 daily records)
-  - `timestamp`: pandas datetime format
+- **Columns**: `timestamp, value, classification` (2,867 daily records)
+  - `timestamp`: pandas datetime format (timezone-aware)
   - `value`: Fear & Greed Index score (0-100 scale)
   - `classification`: Sentiment label (Extreme Fear, Fear, Neutral, Greed, Extreme Greed)
-- **Coverage**: 2018-02-01 to present (complete daily historical data)
+- **Coverage**: 2018-02-01 to 2025-12-11 (complete daily historical data)
 - **Source**: Alternative.me Fear & Greed Index API
-- **Distribution**: Fear (819 days), Greed (789 days), Extreme Fear (564 days), Neutral (388 days), Extreme Greed (281 days)
+- **Distribution**: Fear (826 days), Greed (789 days), Extreme Fear (583 days), Neutral (388 days), Extreme Greed (281 days)
+- **Data Integrity**: Fixed incremental collection logic to preserve all historical data during updates
 
 **Master Dataset Format** (`data/raw/master_dataset_h4_v1.csv`):
 - **Size**: 84MB, 333,571 rows with complete H4 coverage from 2009-01-03 to 2025-11-25
@@ -158,6 +169,13 @@ Eight main data collectors with no confirmation prompts (auto-start) plus unifie
 - **News Processing Data (12 columns)**: `merged_content`, `news_article_count`, `news_log_article_count`, `has_news`, `news_head_sent_net_mean`, `news_global_sent_net_mean`, `news_head_sent_net_max`, `news_head_sent_net_min`, `news_head_sent_net_std`, `news_max_bull_prob`, `news_max_bear_prob`, `original_ids`
 - **Column Naming**: All data source columns use prefixes (BTC_, ETH_) to prevent conflicts and enable clear source identification
 - **Data Quality**: Comprehensive H4 grid alignment with forward-fill for missing values, automatic duplicate removal, and cross-source validation
+
+**Cleaned Dataset Format** (`data/processed/master_dataset_h4_cleaned_v1.csv`):
+- **Size**: 14MB, optimized cleaned version of the master dataset
+- **Purpose**: Production-ready dataset optimized for machine learning pipelines
+- **Processing**: Additional data cleaning, feature engineering, and quality improvements
+- **Data Quality**: Enhanced data integrity with missing value handling and outlier treatment
+- **ML Ready**: Preprocessed features ready for model training and evaluation
 
 ## Common Development Commands
 
@@ -189,11 +207,14 @@ python collectors/8_sentimentindex-d1.py
 
 # Process master dataset (unified H4-aligned dataset with sentiment analysis)
 jupyter lab processors/cleaning.ipynb
+
+# Process cleaned dataset (additional cleaning and ML-ready processing)
+jupyter lab processors/cleaning.ipynb
 ```
 
 ### Data Processing Commands
 ```bash
-# Run the complete cleaning and processing pipeline
+# Run the complete master dataset building pipeline
 jupyter lab processors/cleaning.ipynb
 # Follow the notebook cells sequentially for:
 # - Data loading and validation
@@ -201,6 +222,14 @@ jupyter lab processors/cleaning.ipynb
 # - News content extraction and sentiment analysis
 # - Column prefixing and data merging
 # - Master dataset export and validation
+
+# Run the additional data cleaning pipeline
+jupyter lab processors/cleaning.ipynb
+# Follow the cleaning notebook cells for:
+# - Raw master dataset loading
+# - Additional data cleaning and preprocessing
+# - Feature engineering and quality improvements
+# - Cleaned dataset export for ML pipelines
 
 # Validate the master dataset
 python -c "
@@ -211,6 +240,17 @@ print(f'Columns: {list(df.columns)}')
 print(f'Time Range: {df.timestamp.min()} to {df.timestamp.max()}')
 print(f'Missing Values: {df.isnull().sum().sum()}')
 print(f'H4 Grid Coverage: {df.shape[0]} rows')
+"
+
+# Validate the cleaned dataset
+python -c "
+import pandas as pd
+df = pd.read_csv('data/processed/master_dataset_h4_cleaned_v1.csv')
+print(f'Cleaned Dataset Shape: {df.shape}')
+print(f'Columns: {list(df.columns)}')
+print(f'Time Range: {df.timestamp.min()} to {df.timestamp.max()}')
+print(f'Missing Values: {df.isnull().sum().sum()}')
+print(f'Dataset Size: {df.shape[0]} rows')
 "
 ```
 
@@ -225,6 +265,7 @@ ls -la data/raw/profitandvalue/
 ls -la data/raw/holderbehavior/
 ls -la data/raw/news/
 ls -la data/raw/sentimentindex/
+ls -la data/processed/
 
 # View data samples
 head data/raw/ohlcv/BTC_h4_ohlcv.csv
@@ -240,7 +281,48 @@ head data/raw/sentimentindex/fear_greed_index_d1.csv
 head data/raw/master_dataset_h4_v1.csv
 wc -l data/raw/master_dataset_h4_v1.csv
 ls -lh data/raw/master_dataset_h4_v1.csv
+
+# View cleaned dataset sample and statistics
+head data/processed/master_dataset_h4_cleaned_v1.csv
+wc -l data/processed/master_dataset_h4_cleaned_v1.csv
+ls -lh data/processed/master_dataset_h4_cleaned_v1.csv
 ```
+
+## Configurable Time Collection System
+
+### END_TIME Configuration
+All collectors support a unified configurable time collection system with the following features:
+
+- **Single END_TIME Variable**: Shared across all collectors in `config.py`
+- **Hour-Level Precision**: Supports `YYYY-MM-DD HH:MM` format for precise time control
+- **Flexible Formats**: Accepts `'now'`, `'YYYY-MM-DD'`, or `'YYYY-MM-DD HH:MM'`
+- **Incremental Collection**: Automatically continues from existing data with 24-hour buffer
+- **Timezone-Aware**: All timestamps handled in UTC to prevent timezone conflicts
+
+#### Configuration Examples
+```python
+# Current setting - collect until specific date/time
+END_TIME = '2025-12-10 00:00'  # December 10, 2025 at midnight
+
+# Alternative configurations:
+END_TIME = 'now'  # Collect until current time
+END_TIME = '2024-12-31'  # December 31, 2024 (end of day)
+END_TIME = '2024-12-31 15:30'  # December 31, 2024 at 3:30 PM
+```
+
+#### Time Range Calculation Logic
+The system uses `utils/time_utils.py` for intelligent time range calculation:
+
+1. **Existing Data Detection**: Automatically identifies existing data files and ranges
+2. **Buffer Management**: Uses 24-hour buffer to avoid data gaps during incremental collection
+3. **Timezone Consistency**: All timestamps converted to UTC for reliable comparisons
+4. **Fallback Handling**: Graceful handling when start time is after end time
+
+#### Benefits
+- **Resource Efficiency**: Only fetches missing data instead of re-collecting everything
+- **Data Integrity**: Preserves all historical data while adding new records
+- **Flexible Testing**: Set specific time ranges for testing and development
+- **Production Control**: Precise control over data collection endpoints
 
 ## Important Configuration Details
 
@@ -384,7 +466,12 @@ The `processors/cleaning.ipynb` provides comprehensive data processing capabilit
   - **11 Sentiment Metrics**: Head, global, maximum, and top-K sentiment probabilities per article
   - **ML-Ready Format**: Structured sentiment scores for cryptocurrency market analysis
   - **Time Coverage**: 2012-2025 with complete chronological sentiment tracking
-- Fear & Greed Daily Sentiment: 2,841 records (200KB)
+- Fear & Greed Daily Sentiment: 2,867 records (200KB) - Updated with enhanced data preservation logic
+- **Cleaned Master Dataset**: Production-ready dataset (14MB, optimized for ML pipelines)
+  - **Enhanced Data Quality**: Additional cleaning and preprocessing applied
+  - **ML-Ready Features**: Optimized features for machine learning applications
+  - **Size Reduction**: Compressed from 84MB raw to 14MB cleaned format
+  - **Processing**: Feature engineering and quality improvements applied
 
 ## Network Activity Metrics
 
@@ -505,9 +592,10 @@ The sentiment index collector provides the following market sentiment metrics:
 - **Rate limited**: 1 request per hour (respectful limit for API stability)
 
 ### Historical Coverage
-- **Fear & Greed Index**: From 2018-02-01 to present (daily data)
-- **Complete coverage**: 2,841 daily records with no gaps
+- **Fear & Greed Index**: From 2018-02-01 to 2025-12-11 (daily data)
+- **Complete coverage**: 2,867 daily records with no gaps
 - **Automatic updates**: Extends to most recent available data
+- **Enhanced collection**: Improved incremental update logic preserves all historical data
 
 ### Integration Benefits
 Sentiment index data complements price and market data by:

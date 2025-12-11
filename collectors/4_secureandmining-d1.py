@@ -10,18 +10,27 @@ import os
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from config import (
-    BLOCKCHAIN_API_BASE, MINING_METRICS, ensure_directories, get_mining_file, SECUREANDMINING_DIR
+    BLOCKCHAIN_API_BASE, MINING_METRICS, ensure_directories, get_mining_file, SECUREANDMINING_DIR,
+    END_TIME
 )
 
 import requests
 import pandas as pd
 import time
 from datetime import datetime
+from utils.time_utils import calculate_collection_range, format_time_range_for_display, merge_dataframes, parse_end_time
+import os
 
 
 class BlockchainInfoFetcher:
-    def __init__(self):
+    def __init__(self, end_time=None):
         self.base_url = BLOCKCHAIN_API_BASE
+
+        # Use config default if not provided
+        if end_time is None:
+            end_time = END_TIME
+
+        self.end_time_config = end_time
         ensure_directories()
 
     def fetch_mining_metric(self, metric_key, start_timestamp=None, end_timestamp=None):
@@ -84,11 +93,12 @@ class BlockchainInfoFetcher:
         """Fetch all configured mining metrics"""
         print(f"\n{'='*60}")
         print(f"FETCH SECURITY AND MINING METRICS DAILY DATA")
+        print(f"End Time: {self.end_time_config}")
         print(f"{'='*60}")
 
         print(f"Collecting BTC mining metrics")
         print(f"Metrics: {', '.join(MINING_METRICS.keys())}")
-        print(f"Range: All available historical data")
+        print(f"Range: Full historical data available")
 
         all_data = []
 
@@ -150,8 +160,12 @@ class BlockchainInfoFetcher:
         if df.empty:
             return
 
+        # Apply END_TIME filtering
+        end_time = parse_end_time(self.end_time_config)
+        df_filtered = df[df['timestamp'] <= end_time]
+
         filepath = get_mining_file()
-        df.to_csv(filepath, index=False)
+        df_filtered.to_csv(filepath, index=False)
 
         print(f"\n💾 Saved security and mining data: {filepath}")
         print(f"   Size: {os.path.getsize(filepath) / 1024:.1f} KB")

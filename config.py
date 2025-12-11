@@ -5,10 +5,12 @@ Shared variables used across all data collection scripts
 
 import os
 from pathlib import Path
+from datetime import datetime
 
 # Data directories - Production ready structure
 DATA_DIR = "data"
 RAW_DIR = f"{DATA_DIR}/raw"
+PROCESSED_DIR = f"{DATA_DIR}/processed"
 OHLCV_DIR = f"{RAW_DIR}/ohlcv"
 MARKETCAP_DIR = f"{RAW_DIR}/marketcap"
 NETWORKACTIVITY_DIR = f"{RAW_DIR}/networkactivity"
@@ -100,11 +102,31 @@ AGGREGATION_TIMEFRAMES = {
     'M': '1M'
 }
 
+# Collection Time Configuration
+# Set a specific end time for all data collection
+# Format: 'YYYY-MM-DD' for date-only or 'YYYY-MM-DD HH:MM' for hour-level precision
+# Examples: '2024-12-31', '2024-12-31 15:30', 'now' for current time
+# END_TIME = 'now'  # Default: collect until current time
+# END_TIME = '2024-12-31'  # Example: collect until end of 2024
+# END_TIME = '2024-12-31 15:30'  # Example: collect until Dec 31, 2024 at 3:30 PM
+END_TIME = '2025-12-10 00:00'  # Default: collect until current time
+
+# Default Start Dates for All-Time Collection
+DEFAULT_START_DATES = {
+    'BTC': datetime(2009, 1, 1),  # Bitcoin inception
+    'ETH': datetime(2015, 7, 30),  # Ethereum launch
+    'USDT': datetime(2014, 11, 1),  # Tether launch
+    'USDC': datetime(2018, 9, 26),  # USDC launch
+    'MARKET_CAP': datetime(2013, 4, 28),  # CMC data availability
+    'SENTIMENT_INDEX': datetime(2018, 2, 1),  # Fear & Greed Index start
+    'BITCOIN_MAGAZINE': datetime(2012, 1, 1)  # Bitcoin Magazine archive
+}
+
 # Initialize directories
 def ensure_directories():
     """Create necessary directories if they don't exist"""
     directories = [
-        DATA_DIR, RAW_DIR, OHLCV_DIR, MARKETCAP_DIR, NETWORKACTIVITY_DIR, SECUREANDMINING_DIR, PROFITANDVALUE_DIR, HOLDERBEHAVIOR_DIR, SENTIMENTINDEX_DIR, NEWS_DIR, f"{NEWS_DIR}/html"
+        DATA_DIR, RAW_DIR, PROCESSED_DIR, OHLCV_DIR, MARKETCAP_DIR, NETWORKACTIVITY_DIR, SECUREANDMINING_DIR, PROFITANDVALUE_DIR, HOLDERBEHAVIOR_DIR, SENTIMENTINDEX_DIR, NEWS_DIR, f"{NEWS_DIR}/html"
     ]
     for directory in directories:
         if not os.path.exists(directory):
@@ -146,3 +168,7 @@ def get_news_file() -> str:
 def get_master_dataset_file() -> str:
     """Get master cleaned dataset file path (raw data)"""
     return f"{RAW_DIR}/master_dataset_h4_v1.csv"
+
+def get_cleaned_dataset_file() -> str:
+    """Get cleaned dataset file path"""
+    return f"{PROCESSED_DIR}/master_dataset_h4_cleaned_v1.pkl"
