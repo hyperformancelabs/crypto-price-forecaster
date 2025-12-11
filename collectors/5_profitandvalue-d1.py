@@ -13,18 +13,27 @@ sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from config import (
     COINS, NETWORK_API_BASE, PROFITANDVALUE_METRICS,
     PROFITANDVALUE_CHUNK_DAYS, PROFITANDVALUE_RATE_LIMIT,
-    ensure_directories, get_profitandvalue_file
+    ensure_directories, get_profitandvalue_file,
+    END_TIME
 )
 
 import requests
 import pandas as pd
 import time
 from datetime import datetime, timedelta
+from utils.time_utils import calculate_collection_range, format_time_range_for_display, merge_dataframes, parse_end_time
+import os
 
 
 class CoinMetricsProfitAndValueFetcher:
-    def __init__(self):
+    def __init__(self, end_time=None):
         self.base_url = NETWORK_API_BASE
+
+        # Use config default if not provided
+        if end_time is None:
+            end_time = END_TIME
+
+        self.end_time_config = end_time
         ensure_directories()
 
     def fetch_profit_and_value_metrics(self, coin, metrics, start_date, end_date):
@@ -181,8 +190,12 @@ class CoinMetricsProfitAndValueFetcher:
         if df.empty:
             return
 
+        # Apply END_TIME filtering
+        end_time = parse_end_time(self.end_time_config)
+        df_filtered = df[df['timestamp'] <= end_time]
+
         filepath = get_profitandvalue_file(coin)
-        df.to_csv(filepath, index=False)
+        df_filtered.to_csv(filepath, index=False)
 
         print(f"\n💾 Saved {coin}: {filepath}")
         print(f"   Size: {os.path.getsize(filepath) / 1024:.1f} KB")

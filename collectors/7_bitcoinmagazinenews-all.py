@@ -30,8 +30,9 @@ from tqdm import tqdm
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from config import (
     NEWS_DIR, NEWS_RATE_LIMIT, NEWS_USER_AGENT, NEWS_MAX_RETRIES,
-    ensure_directories, get_news_file
+    ensure_directories, get_news_file, END_TIME
 )
+from utils.time_utils import format_time_range_for_display, parse_end_time
 
 # Configuration - using centralized config
 BASE_URL = "https://bitcoinmagazine.com"
@@ -67,19 +68,45 @@ def load_master_csv():
     return articles
 
 def save_master_csv(articles):
-    """Save updated master CSV"""
+    """Save updated master CSV with END_TIME filtering"""
+    # Apply END_TIME filtering
+    filtered_articles = filter_articles_by_endtime(articles, END_TIME)
+
     with open(MASTER_CSV, 'w', newline='', encoding='utf-8') as f:
         fieldnames = ['id', 'datetime', 'url', 'status']
         writer = csv.DictWriter(f, fieldnames=fieldnames)
         writer.writeheader()
 
-        for article in articles:
+        for article in filtered_articles:
             writer.writerow({
                 'id': article['id'],
                 'datetime': article['datetime'],
                 'url': article['url'],
                 'status': article['status']
             })
+
+def filter_articles_by_endtime(articles, end_time_config):
+    """Filter articles to only include those up to END_TIME"""
+    if end_time_config.lower() == 'now':
+        return articles
+
+    end_time = parse_end_time(end_time_config)
+    filtered_articles = []
+
+    for article in articles:
+        try:
+            article_time = datetime.fromisoformat(article['datetime'].replace('Z', '+00:00'))
+            if article_time <= end_time:
+                filtered_articles.append(article)
+        except:
+            # If we can't parse the datetime, keep the article (conservative approach)
+            filtered_articles.append(article)
+
+    if len(filtered_articles) < len(articles):
+        removed_count = len(articles) - len(filtered_articles)
+        print(f"   📅 Filtered out {removed_count} articles beyond END_TIME ({end_time})")
+
+    return filtered_articles
 
 def make_request(url, retries=MAX_RETRIES):
     """Make HTTP request with retry logic"""
@@ -241,12 +268,18 @@ def scrape_article(url, article_id, article_datetime):
         return False
 
 class BitcoinMagazineScraper:
-    def __init__(self):
+    def __init__(self, end_time=None):
         self.articles = []
         self.interrupted = False
         self.scraped_count = 0
         self.pending_count = 0
         self.failed_count = 0
+
+        # Use config default if not provided
+        if end_time is None:
+            end_time = END_TIME
+
+        self.end_time_config = end_time
 
         signal.signal(signal.SIGINT, self._signal_handler)
         signal.signal(signal.SIGTERM, self._signal_handler)

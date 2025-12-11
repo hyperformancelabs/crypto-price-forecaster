@@ -7,24 +7,32 @@ No API key required - uses free Community API
 
 import sys
 import os
-import sys
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from config import (
     COINS, NETWORK_API_BASE, NETWORK_ACTIVITY_METRICS,
     NETWORK_CHUNK_DAYS, NETWORK_RATE_LIMIT,
-    ensure_directories, get_networkactivity_file
+    ensure_directories, get_networkactivity_file,
+    END_TIME
 )
 
 import requests
 import pandas as pd
 import time
 from datetime import datetime, timedelta
+from utils.time_utils import calculate_collection_range, format_time_range_for_display, merge_dataframes, parse_end_time
+import os
 
 
 class CoinMetricsFetcher:
-    def __init__(self):
+    def __init__(self, end_time=None):
         self.base_url = NETWORK_API_BASE
+
+        # Use config default if not provided
+        if end_time is None:
+            end_time = END_TIME
+
+        self.end_time_config = end_time
         ensure_directories()
 
     def fetch_network_metrics(self, coin, metrics, start_date, end_date):
@@ -85,26 +93,25 @@ class CoinMetricsFetcher:
             print(f"  ❌ Error: {e}")
             return pd.DataFrame()
 
-    def fetch_coin_alltime(self, coin):
-        """Fetch all historical network activity data for a coin"""
+    def fetch_coin_data(self, coin):
+        """Fetch network activity data for a coin based on collection configuration"""
         metrics = NETWORK_ACTIVITY_METRICS.get(coin, [])
         if not metrics:
             print(f"  ⚠️ No metrics configured for {coin}")
             return pd.DataFrame()
 
-        # Set appropriate start dates based on coin history
-        if coin == 'BTC':
-            start_date = datetime(2009, 1, 1)  # Bitcoin inception
-        elif coin == 'ETH':
-            start_date = datetime(2015, 7, 30)  # Ethereum launch
-        else:
-            start_date = datetime(2015, 1, 1)  # Default for other coins
-
-        end_date = datetime.now()
+        # Calculate time range
+        file_path = get_networkactivity_file(coin)
+        start_date, end_date = calculate_collection_range(
+            self.end_time_config,
+            data_type='network_activity',
+            coin=coin,
+            file_path=file_path
+        )
 
         print(f"\n📊 Fetching {coin} network activity")
         print(f"   Metrics: {', '.join(metrics)}")
-        print(f"   Range: {start_date.date()} → {end_date.date()}")
+        print(f"   Range: {format_time_range_for_display(start_date, end_date)}")
 
         all_data = []
         current_start = start_date
@@ -152,14 +159,28 @@ class CoinMetricsFetcher:
         """Fetch network activity data for all configured coins"""
         print(f"\n{'='*60}")
         print(f"FETCH NETWORK ACTIVITY DAILY DATA")
+        print(f"End Time: {self.end_time_config}")
         print(f"{'='*60}")
 
         all_data = {}
 
         for coin in COINS:
-            df = self.fetch_coin_alltime(coin)
+            df = self.fetch_coin_data(coin)
 
             if not df.empty:
+                # Merge with existing data if file exists
+                file_path = get_networkactivity_file(coin)
+                if os.path.exists(file_path):
+                    try:
+                        existing_df = pd.read_csv(file_path)
+                        existing_df['timestamp'] = pd.to_datetime(existing_df['timestamp'])
+
+                        # Merge with existing data
+                        df = merge_dataframes(existing_df, df)
+                        print(f"   Merged with existing data. Total records: {len(df)}")
+                    except Exception as e:
+                        print(f"   Warning: Could not merge with existing data: {e}")
+
                 all_data[coin] = df
                 # Save individual coin file
                 self.save_coin_csv(df, coin)
@@ -173,8 +194,12 @@ class CoinMetricsFetcher:
         if df.empty:
             return
 
+        # Apply END_TIME filtering
+        end_time = parse_end_time(self.end_time_config)
+        df_filtered = df[df['timestamp'] <= end_time]
+
         filepath = get_networkactivity_file(coin)
-        df.to_csv(filepath, index=False)
+        df_filtered.to_csv(filepath, index=False)
 
         print(f"\n💾 Saved {coin}: {filepath}")
         print(f"   Size: {os.path.getsize(filepath) / 1024:.1f} KB")
