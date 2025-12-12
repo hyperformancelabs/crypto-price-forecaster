@@ -22,7 +22,7 @@ import requests
 import pandas as pd
 import time
 from datetime import datetime, timedelta
-from utils.time_utils import calculate_collection_range, format_time_range_for_display, merge_dataframes, parse_end_time
+from utils.time_utils import calculate_collection_range, format_time_range_for_display, merge_dataframes, parse_end_time, truncate_dataset_to_end_time
 
 
 class CoinMetricsFetcher:
@@ -102,6 +102,7 @@ class HolderBehaviorCollector:
 
         self.end_time_config = end_time
         self.fetcher = CoinMetricsFetcher()
+        self.base_url = NETWORK_API_BASE
 
         print("⚠️  BTC HOLDER BEHAVIOR DATA COLLECTION - FREE TIER LIMITATIONS")
         print("   Available metrics (Free Tier):")
@@ -261,7 +262,12 @@ class HolderBehaviorCollector:
             try:
                 existing_df = pd.read_csv(file_path)
                 existing_df['timestamp'] = pd.to_datetime(existing_df['timestamp'])
+
+                # Apply END_TIME truncation to existing data
+                existing_df = truncate_dataset_to_end_time(existing_df, self.end_time_config)
+
                 print(f"Found existing data: {len(existing_df)} records")
+                print(f"Date range: {existing_df['timestamp'].min()} → {existing_df['timestamp'].max()}")
             except Exception as e:
                 print(f"Warning: Could not load existing data: {e}")
 
@@ -275,6 +281,9 @@ class HolderBehaviorCollector:
                     print(f"Merged with existing data. Total records: {len(df)}")
                 except Exception as e:
                     print(f"Warning: Could not merge with existing data: {e}")
+
+            # Apply END_TIME truncation to final merged data
+            df = truncate_dataset_to_end_time(df, self.end_time_config)
 
             # Save data
             df.to_csv(file_path, index=False)
@@ -314,12 +323,11 @@ class HolderBehaviorCollector:
         if df.empty:
             return
 
-        # Apply END_TIME filtering
-        end_time = parse_end_time(self.end_time_config)
-        df_filtered = df[df['timestamp'] <= end_time]
+        # Apply END_TIME truncation
+        df = truncate_dataset_to_end_time(df, self.end_time_config)
 
         filepath = get_holderbehavior_file(coin)
-        df_filtered.to_csv(filepath, index=False)
+        df.to_csv(filepath, index=False)
 
         print(f"\n💾 Saved {coin}: {filepath}")
         print(f"   Size: {os.path.getsize(filepath) / 1024:.1f} KB")

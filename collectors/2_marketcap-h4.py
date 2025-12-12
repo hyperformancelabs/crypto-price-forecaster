@@ -18,7 +18,7 @@ import requests
 import pandas as pd
 import time
 from datetime import datetime, timedelta
-from utils.time_utils import calculate_collection_range, format_time_range_for_display, merge_dataframes, parse_end_time
+from utils.time_utils import calculate_collection_range, format_time_range_for_display, merge_dataframes, parse_end_time, truncate_dataset_to_end_time
 import os
 
 
@@ -52,35 +52,51 @@ class MarketCapH4Fetcher:
 
             if response.status_code != 200:
                 print(f"  ❌ HTTP {response.status_code}")
+                print(f"  Response: {response.text[:200]}")
                 return pd.DataFrame()
 
             data = response.json()
 
-            if 'data' not in data or 'quotes' not in data['data']:
-                print(f"  ⚠️ No data in response")
+            # Debug: print the actual response structure
+            if 'data' not in data:
+                print(f"  ⚠️ No 'data' key in response")
+                print(f"  Keys: {list(data.keys())}")
+                print(f"  Response: {data}")
+                return pd.DataFrame()
+
+            if 'quotes' not in data['data']:
+                print(f"  ⚠️ No 'quotes' key in data")
+                print(f"  Data keys: {list(data['data'].keys())}")
+                print(f"  Data: {data['data']}")
                 return pd.DataFrame()
 
             quotes = data['data']['quotes']
 
             if not quotes:
-                print(f"  ⚠️ Empty quotes")
+                print(f"  ⚠️ Empty quotes array")
                 return pd.DataFrame()
 
             records = []
             for quote in quotes:
                 q = quote['quote']
+                market_cap = q.get('marketCap', 0)
                 records.append({
                     'timestamp': pd.to_datetime(q['timestamp']),
-                    f'{coin_name}_market_cap': q.get('marketCap', 0)
+                    f'{coin_name}_market_cap': market_cap
                 })
 
             df = pd.DataFrame(records)
-            print(f"  ✅ {len(df)} H4 candles")
+
+            # Filter out zero market cap values (these are likely data gaps)
+            non_zero_count = len(df[df[f'{coin_name}_market_cap'] > 0])
+            print(f"  ✅ {len(df)} total records, {non_zero_count} with non-zero market cap")
 
             return df
 
         except Exception as e:
             print(f"  ❌ Error: {e}")
+            import traceback
+            traceback.print_exc()
             return pd.DataFrame()
 
     def fetch_coin_data(self, coin_name, coin_id):
@@ -149,6 +165,32 @@ class MarketCapH4Fetcher:
         print(f"End Time: {self.end_time_config}")
         print(f"{'='*60}")
 
+        # Check if existing file needs truncation only
+        file_path = get_marketcap_file()
+        if os.path.exists(file_path):
+            try:
+                existing_df = pd.read_csv(file_path)
+                existing_df['timestamp'] = pd.to_datetime(existing_df['timestamp'])
+
+                # Apply END_TIME truncation to existing data
+                existing_df = truncate_dataset_to_end_time(existing_df, self.end_time_config)
+
+                # Check if any data goes beyond END_TIME
+                end_time = parse_end_time(self.end_time_config)
+                max_timestamp = existing_df['timestamp'].max()
+
+                if max_timestamp <= end_time:
+                    print(f"✅ Existing data already respects END_TIME")
+                    print(f"   Current range: {existing_df['timestamp'].min()} → {existing_df['timestamp'].max()}")
+                    return existing_df
+                else:
+                    print(f"⚠️ Existing data has records beyond END_TIME")
+                    print(f"   Current range: {existing_df['timestamp'].min()} → {max_timestamp}")
+                    print(f"   Truncating to: ... → {end_time}")
+
+            except Exception as e:
+                print(f"Warning: Could not read existing file: {e}")
+
         all_data = {}
 
         for coin_name, coin_id in CMC_IDS.items():
@@ -160,8 +202,14 @@ class MarketCapH4Fetcher:
             time.sleep(REQUEST_DELAY)
 
         if not all_data:
-            print("\n❌ No data collected!")
-            return None
+            # No new data collected, just return truncated existing data
+            if os.path.exists(file_path):
+                existing_df = pd.read_csv(file_path)
+                existing_df['timestamp'] = pd.to_datetime(existing_df['timestamp'])
+                return truncate_dataset_to_end_time(existing_df, self.end_time_config)
+            else:
+                print("\n❌ No data collected and no existing file!")
+                return None
 
         # Merge with existing data if file exists
         file_path = get_marketcap_file()
@@ -228,16 +276,19 @@ class MarketCapH4Fetcher:
                 )
 
         merged = merged.sort_values('timestamp').reset_index(drop=True)
-        merged = merged.ffill().fillna(0)
 
-        cols = ['timestamp'] + [
-            f'{c}_market_cap' for c in CMC_IDS.keys()
-        ]
+        # Filter out records where ALL market cap values are zero (these are data gaps)
+        market_cap_cols = [f'{c}_market_cap' for c in CMC_IDS.keys()]
+        merged = merged[merged[market_cap_cols].sum(axis=1) > 0].copy()
+
+        # Only forward-fill within reasonable time gaps (don't create false data)
+        merged = merged.ffill(limit=6)  # Only fill up to 6 hour gaps (1.5 H4 periods)
+
+        cols = ['timestamp'] + market_cap_cols
         merged = merged[cols]
 
-        # Apply END_TIME filtering to final merged dataset
-        end_time = parse_end_time(self.end_time_config)
-        merged = merged[merged['timestamp'] <= end_time]
+        # Apply END_TIME truncation to ensure dataset respects configuration
+        merged = truncate_dataset_to_end_time(merged, self.end_time_config)
 
         print(f"✅ Merged dataset:")
         print(f"   Rows: {len(merged):,} H4 candles")

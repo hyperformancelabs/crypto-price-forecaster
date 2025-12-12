@@ -16,7 +16,7 @@ from config import (
 import requests
 import pandas as pd
 import numpy as np
-from utils.time_utils import calculate_collection_range, format_time_range_for_display, merge_dataframes
+from utils.time_utils import calculate_collection_range, format_time_range_for_display, merge_dataframes, truncate_dataset_to_end_time
 import os
 
 
@@ -109,7 +109,7 @@ class BinanceFetcher:
             'taker_buy_quote', 'ignore'
         ])
 
-        df['timestamp'] = pd.to_datetime(df['timestamp'], unit='ms')
+        df['timestamp'] = pd.to_datetime(df['timestamp'], unit='ms', utc=True)
 
         for col in ['open', 'high', 'low', 'close', 'volume', 'quote_volume']:
             df[col] = df[col].astype(float)
@@ -163,18 +163,51 @@ class CryptoDataCollector:
                     try:
                         existing_df = pd.read_csv(file_path)
                         existing_df['timestamp'] = pd.to_datetime(existing_df['timestamp'])
+                        # Make existing data timezone-aware for consistency
+                        import pytz
+                        if existing_df['timestamp'].dt.tz is None:
+                            existing_df['timestamp'] = existing_df['timestamp'].dt.tz_localize('UTC')
                         df = merge_dataframes(existing_df, df)
                         print(f"Merged with existing data. Total records: {len(df)}")
                     except Exception as e:
                         print(f"Warning: Could not merge with existing data: {e}")
 
+                # Apply END_TIME truncation to ensure dataset respects configuration
+                df = truncate_dataset_to_end_time(df, self.end_time_config)
+
                 # Save data
                 df.to_csv(file_path, index=False)
                 print(f"Saved: {file_path}")
-                print(f"Range: {df['timestamp'].min()} → {df['timestamp'].max()}")
+                print(f"Final range: {df['timestamp'].min()} → {df['timestamp'].max()}")
                 print(f"Candles: {len(df)}\n")
             else:
-                print(f"No data collected for {coin}\n")
+                print(f"No new data collected for {coin}")
+
+                # Even when no new data, check if existing data needs truncation
+                if os.path.exists(file_path):
+                    try:
+                        existing_df = pd.read_csv(file_path)
+                        existing_df['timestamp'] = pd.to_datetime(existing_df['timestamp'])
+                        # Make existing data timezone-aware for consistency
+                        import pytz
+                        if existing_df['timestamp'].dt.tz is None:
+                            existing_df['timestamp'] = existing_df['timestamp'].dt.tz_localize('UTC')
+
+                        # Apply truncation to existing data
+                        df_truncated = truncate_dataset_to_end_time(existing_df, self.end_time_config)
+
+                        # Only save if truncation occurred
+                        if len(df_truncated) < len(existing_df):
+                            df_truncated.to_csv(file_path, index=False)
+                            print(f"Truncated existing dataset to END_TIME: {file_path}")
+                            print(f"Final range: {df_truncated['timestamp'].min()} → {df_truncated['timestamp'].max()}")
+                            print(f"Candles: {len(df_truncated)}\n")
+                        else:
+                            print(f"Existing dataset already respects END_TIME\n")
+                    except Exception as e:
+                        print(f"Warning: Could not truncate existing data: {e}\n")
+                else:
+                    print(f"No existing file found: {file_path}\n")
 
             time.sleep(1)
 

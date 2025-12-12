@@ -18,7 +18,7 @@ import requests
 import pandas as pd
 import time
 from datetime import datetime
-from utils.time_utils import calculate_collection_range, format_time_range_for_display, merge_dataframes, parse_end_time
+from utils.time_utils import calculate_collection_range, format_time_range_for_display, merge_dataframes, parse_end_time, truncate_dataset_to_end_time
 import os
 
 
@@ -72,7 +72,7 @@ class BlockchainInfoFetcher:
 
             for item in data['values']:
                 record = {
-                    'timestamp': pd.to_datetime(item['x'], unit='s'),
+                    'timestamp': pd.to_datetime(item['x'], unit='s', utc=True),
                     'metric': metric_key,
                     'value': float(item['y']) if item['y'] else 0,
                     'unit': metric_info.get('unit', ''),
@@ -96,9 +96,35 @@ class BlockchainInfoFetcher:
         print(f"End Time: {self.end_time_config}")
         print(f"{'='*60}")
 
+        # Get file path and check existing data
+        file_path = get_mining_file()
+
+        # Load existing data if file exists
+        existing_df = None
+        if os.path.exists(file_path):
+            try:
+                existing_df = pd.read_csv(file_path)
+                existing_df['timestamp'] = pd.to_datetime(existing_df['timestamp'])
+
+                # Apply END_TIME truncation to existing data
+                existing_df = truncate_dataset_to_end_time(existing_df, self.end_time_config)
+
+                print(f"Found existing data: {len(existing_df)} records")
+                print(f"Date range: {existing_df['timestamp'].min()} → {existing_df['timestamp'].max()}")
+            except Exception as e:
+                print(f"Warning: Could not load existing data: {e}")
+                existing_df = None
+
+        # Calculate time range based on config
+        start_time, end_time = calculate_collection_range(
+            self.end_time_config,
+            data_type='secureandmining',
+            file_path=file_path
+        )
+
         print(f"Collecting BTC mining metrics")
         print(f"Metrics: {', '.join(MINING_METRICS.keys())}")
-        print(f"Range: Full historical data available")
+        print(f"Time Range: {format_time_range_for_display(start_time, end_time)}")
 
         all_data = []
 
@@ -153,6 +179,11 @@ class BlockchainInfoFetcher:
         print(f"\n📊 Final dataset: {len(df_pivot)} daily records")
         print(f"Columns: {list(df_pivot.columns)}")
 
+        # Merge with existing data if applicable
+        if existing_df is not None:
+            df_pivot = merge_dataframes(existing_df, df_pivot)
+            print(f"Merged with existing data. Total records: {len(df_pivot)}")
+
         return df_pivot
 
     def save_mining_data(self, df):
@@ -160,12 +191,11 @@ class BlockchainInfoFetcher:
         if df.empty:
             return
 
-        # Apply END_TIME filtering
-        end_time = parse_end_time(self.end_time_config)
-        df_filtered = df[df['timestamp'] <= end_time]
+        # Apply END_TIME truncation
+        df = truncate_dataset_to_end_time(df, self.end_time_config)
 
         filepath = get_mining_file()
-        df_filtered.to_csv(filepath, index=False)
+        df.to_csv(filepath, index=False)
 
         print(f"\n💾 Saved security and mining data: {filepath}")
         print(f"   Size: {os.path.getsize(filepath) / 1024:.1f} KB")
