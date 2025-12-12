@@ -38,6 +38,11 @@ def parse_end_time(end_time_config: str) -> datetime:
             try:
                 # Parse as naive datetime, then make it timezone-aware
                 parsed_time = datetime.strptime(end_time_config.strip(), fmt)
+
+                # For date-only format, set time to midnight (00:00:00)
+                if fmt == '%Y-%m-%d':
+                    parsed_time = parsed_time.replace(hour=0, minute=0, second=0, microsecond=0)
+
                 return pytz.UTC.localize(parsed_time)
             except ValueError:
                 continue
@@ -234,6 +239,50 @@ def validate_time_range(start_time: datetime, end_time: datetime) -> bool:
         return False
 
     return True
+
+
+def truncate_dataset_to_end_time(df: pd.DataFrame, end_time_config: str,
+                                timestamp_column: str = 'timestamp') -> pd.DataFrame:
+    """
+    Truncate dataset to ensure all records are <= END_TIME
+
+    Args:
+        df: DataFrame to truncate
+        end_time_config: END_TIME configuration string
+        timestamp_column: Name of the timestamp column
+
+    Returns:
+        Truncated DataFrame
+    """
+    if df.empty:
+        return df
+
+    end_time = parse_end_time(end_time_config)
+
+    # Ensure timestamp column is datetime and timezone-aware
+    df[timestamp_column] = pd.to_datetime(df[timestamp_column])
+
+    # Make timestamp column timezone-aware if it isn't already
+    import pytz
+    if df[timestamp_column].dt.tz is None:
+        df[timestamp_column] = df[timestamp_column].dt.tz_localize('UTC')
+
+    # Count records before truncation for reporting
+    original_count = len(df)
+    original_max = df[timestamp_column].max()
+
+    # Filter to keep only records <= end_time
+    df_truncated = df[df[timestamp_column] <= end_time].copy()
+
+    # Report truncation if any
+    if len(df_truncated) < original_count:
+        removed_count = original_count - len(df_truncated)
+        print(f"⚠️  END_TIME truncation: removed {removed_count:,} records")
+        print(f"   Original range: ... → {original_max}")
+        print(f"   Truncated to: ... → {end_time}")
+        print(f"   New range: {df_truncated[timestamp_column].min()} → {df_truncated[timestamp_column].max()}")
+
+    return df_truncated
 
 
 def adjust_for_api_limits(start_time: datetime, end_time: datetime, max_days: int = 365) -> Tuple[datetime, datetime]:

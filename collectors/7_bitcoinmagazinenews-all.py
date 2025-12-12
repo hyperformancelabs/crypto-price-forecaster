@@ -32,7 +32,7 @@ from config import (
     NEWS_DIR, NEWS_RATE_LIMIT, NEWS_USER_AGENT, NEWS_MAX_RETRIES,
     ensure_directories, get_news_file, END_TIME
 )
-from utils.time_utils import format_time_range_for_display, parse_end_time
+from utils.time_utils import parse_end_time
 
 # Configuration - using centralized config
 BASE_URL = "https://bitcoinmagazine.com"
@@ -67,46 +67,44 @@ def load_master_csv():
 
     return articles
 
-def save_master_csv(articles):
+def filter_articles_by_endtime(articles, end_time):
+    """Filter articles to only include those up to end_time"""
+    filtered_articles = []
+
+    for article in articles:
+        try:
+            # Parse article datetime
+            if article['datetime']:
+                article_time = datetime.fromisoformat(article['datetime'].replace('Z', '+00:00'))
+                if article_time <= end_time:
+                    filtered_articles.append(article)
+            else:
+                # If no datetime, include it (conservative approach)
+                filtered_articles.append(article)
+        except:
+            # If parsing fails, include it (conservative approach)
+            filtered_articles.append(article)
+
+    return filtered_articles
+
+def save_master_csv(articles, end_time=None):
     """Save updated master CSV with END_TIME filtering"""
-    # Apply END_TIME filtering
-    filtered_articles = filter_articles_by_endtime(articles, END_TIME)
+    # Apply END_TIME filtering if end_time is provided
+    if end_time is not None:
+        articles = filter_articles_by_endtime(articles, end_time)
 
     with open(MASTER_CSV, 'w', newline='', encoding='utf-8') as f:
         fieldnames = ['id', 'datetime', 'url', 'status']
         writer = csv.DictWriter(f, fieldnames=fieldnames)
         writer.writeheader()
 
-        for article in filtered_articles:
+        for article in articles:
             writer.writerow({
                 'id': article['id'],
                 'datetime': article['datetime'],
                 'url': article['url'],
                 'status': article['status']
             })
-
-def filter_articles_by_endtime(articles, end_time_config):
-    """Filter articles to only include those up to END_TIME"""
-    if end_time_config.lower() == 'now':
-        return articles
-
-    end_time = parse_end_time(end_time_config)
-    filtered_articles = []
-
-    for article in articles:
-        try:
-            article_time = datetime.fromisoformat(article['datetime'].replace('Z', '+00:00'))
-            if article_time <= end_time:
-                filtered_articles.append(article)
-        except:
-            # If we can't parse the datetime, keep the article (conservative approach)
-            filtered_articles.append(article)
-
-    if len(filtered_articles) < len(articles):
-        removed_count = len(articles) - len(filtered_articles)
-        print(f"   📅 Filtered out {removed_count} articles beyond END_TIME ({end_time})")
-
-    return filtered_articles
 
 def make_request(url, retries=MAX_RETRIES):
     """Make HTTP request with retry logic"""
@@ -199,13 +197,33 @@ def parse_post_sitemap(sitemap_url):
         root = ET.fromstring(response.content)
         namespace = {'ns': 'http://www.sitemaps.org/schemas/sitemap/0.9'}
 
+        # Check if this is a news sitemap with publication dates
+        news_namespace = {'news': 'http://www.google.com/schemas/sitemap-news/0.9'}
+
         for url in root.findall('.//ns:url', namespace):
             loc = url.find('ns:loc', namespace)
             lastmod = url.find('ns:lastmod', namespace)
 
             if loc is not None:
                 article_url = loc.text
+
+                # Default to lastmod for regular sitemaps
                 lastmod_date = lastmod.text if lastmod is not None else ''
+
+                # For news sitemap, try to extract publication_date using text search
+                if not lastmod_date and 'news-sitemap' in sitemap_url:
+                    # Extract publication_date from XML content directly
+                    url_element = url
+                    if url_element is not None:
+                        # Find publication_date element regardless of namespace
+                        pub_date_elem = None
+                        for child in url_element.iter():
+                            if child.tag.endswith('publication_date'):
+                                pub_date_elem = child
+                                break
+
+                        if pub_date_elem is not None:
+                            lastmod_date = pub_date_elem.text
 
                 if is_article_url(article_url):
                     articles.append((article_url, lastmod_date))
@@ -280,6 +298,7 @@ class BitcoinMagazineScraper:
             end_time = END_TIME
 
         self.end_time_config = end_time
+        self.end_time = parse_end_time(self.end_time_config)
 
         signal.signal(signal.SIGINT, self._signal_handler)
         signal.signal(signal.SIGTERM, self._signal_handler)
@@ -294,6 +313,7 @@ class BitcoinMagazineScraper:
         print(f"Data directory: {DATA_DIR}")
         print(f"Master CSV: {MASTER_CSV}")
         print(f"HTML directory: {HTML_DIR}")
+        print(f"END_TIME: {self.end_time_config}")
 
         # Load existing articles
         print("Loading existing data...")
@@ -395,21 +415,21 @@ class BitcoinMagazineScraper:
 
                     # Save progress every 10 articles
                     if (self.scraped_count + self.failed_count) % 10 == 0:
-                        save_master_csv(self.articles)
+                        save_master_csv(self.articles, self.end_time)
 
                 pbar.close()
             else:
                 print("\nNo pending articles to crawl.")
 
             # Final save
-            save_master_csv(self.articles)
+            save_master_csv(self.articles, self.end_time)
 
         except Exception as e:
             print(f"Fatal error: {e}")
 
         finally:
             # Save final state
-            save_master_csv(self.articles)
+            save_master_csv(self.articles, self.end_time)
 
             # Final summary
             print(f"\nScraping completed!")

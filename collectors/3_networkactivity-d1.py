@@ -20,7 +20,7 @@ import requests
 import pandas as pd
 import time
 from datetime import datetime, timedelta
-from utils.time_utils import calculate_collection_range, format_time_range_for_display, merge_dataframes, parse_end_time
+from utils.time_utils import calculate_collection_range, format_time_range_for_display, merge_dataframes, parse_end_time, truncate_dataset_to_end_time
 import os
 
 
@@ -181,9 +181,31 @@ class CoinMetricsFetcher:
                     except Exception as e:
                         print(f"   Warning: Could not merge with existing data: {e}")
 
+                # Apply END_TIME truncation to ensure dataset respects configuration
+                df = truncate_dataset_to_end_time(df, self.end_time_config)
+
                 all_data[coin] = df
                 # Save individual coin file
                 self.save_coin_csv(df, coin)
+            else:
+                # Even when no new data, check if existing data needs truncation
+                file_path = get_networkactivity_file(coin)
+                if os.path.exists(file_path):
+                    try:
+                        existing_df = pd.read_csv(file_path)
+                        existing_df['timestamp'] = pd.to_datetime(existing_df['timestamp'])
+
+                        # Apply truncation to existing data
+                        df_truncated = truncate_dataset_to_end_time(existing_df, self.end_time_config)
+
+                        # Only save if truncation occurred
+                        if len(df_truncated) < len(existing_df):
+                            self.save_coin_csv(df_truncated, coin)
+                            print(f"   Truncated existing dataset to END_TIME")
+                        else:
+                            print(f"   Existing dataset already respects END_TIME")
+                    except Exception as e:
+                        print(f"   Warning: Could not truncate existing data: {e}")
 
             time.sleep(1)  # Small delay between coins
 

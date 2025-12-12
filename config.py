@@ -109,7 +109,7 @@ AGGREGATION_TIMEFRAMES = {
 # END_TIME = 'now'  # Default: collect until current time
 # END_TIME = '2024-12-31'  # Example: collect until end of 2024
 # END_TIME = '2024-12-31 15:30'  # Example: collect until Dec 31, 2024 at 3:30 PM
-END_TIME = '2025-12-10 00:00'  # Default: collect until current time
+END_TIME = '2025-11-14 00:00'  # Default: collect until end of November 14, 2025
 
 # Default Start Dates for All-Time Collection
 DEFAULT_START_DATES = {
@@ -117,7 +117,7 @@ DEFAULT_START_DATES = {
     'ETH': datetime(2015, 7, 30),  # Ethereum launch
     'USDT': datetime(2014, 11, 1),  # Tether launch
     'USDC': datetime(2018, 9, 26),  # USDC launch
-    'MARKET_CAP': datetime(2013, 4, 28),  # CMC data availability
+    'MARKET_CAP': datetime(2020, 1, 1),  # Realistic H4 market cap data start
     'SENTIMENT_INDEX': datetime(2018, 2, 1),  # Fear & Greed Index start
     'BITCOIN_MAGAZINE': datetime(2012, 1, 1)  # Bitcoin Magazine archive
 }

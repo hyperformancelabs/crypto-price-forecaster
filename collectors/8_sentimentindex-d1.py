@@ -20,7 +20,7 @@ import pandas as pd
 import time
 import os
 from datetime import datetime, timedelta
-from utils.time_utils import calculate_collection_range, format_time_range_for_display, merge_dataframes
+from utils.time_utils import calculate_collection_range, format_time_range_for_display, merge_dataframes, parse_end_time, truncate_dataset_to_end_time
 
 
 class SentimentIndexFetcher:
@@ -177,6 +177,9 @@ class SentimentIndexCollector:
 
         # If we have existing data, find what's new
         if existing_df is not None:
+            # Apply END_TIME truncation to existing data
+            existing_df = truncate_dataset_to_end_time(existing_df, self.end_time_config)
+
             # Find the latest timestamp in existing data
             latest_existing = existing_df['timestamp'].max()
             print(f"Latest existing data: {latest_existing}")
@@ -189,12 +192,12 @@ class SentimentIndexCollector:
             df = merge_dataframes(existing_df, df_new)
             print(f"Merged with existing data. Total records: {len(df)}")
 
-            # Apply END_TIME filter to merged dataset
-            df = df[df['timestamp'] <= end_time]
-            print(f"Applied END_TIME filter. Records after filtering: {len(df)}")
+            # Apply END_TIME truncation to merged dataset
+            df = truncate_dataset_to_end_time(df, self.end_time_config)
+            print(f"Applied END_TIME truncation. Records after filtering: {len(df)}")
         else:
             # No existing data, keep all records up to END_TIME
-            df = df_all[df_all['timestamp'] <= end_time]
+            df = truncate_dataset_to_end_time(df_all, self.end_time_config)
             print(f"No existing data, keeping {len(df)} records up to END_TIME")
 
         # Save to file
