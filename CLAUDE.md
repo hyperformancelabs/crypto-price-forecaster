@@ -7,7 +7,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 Crypto Price Forecaster is a cryptocurrency data collection and preprocessing system designed for machine learning and technical analysis. The project collects historical OHLCV (Open, High, Low, Close, Volume) data, market cap data, and news articles for major cryptocurrencies from multiple API sources.
 
 **Primary focus**: Historical data collection for BTC/ETH with multiple timeframes (H4, Daily) + comprehensive news scraping
-**Data sources**: Binance API (OHLCV), CoinMarketCap API (market cap), CoinMetrics API (network activity & profit metrics), Blockchain.info API (mining metrics), Bitcoin Magazine (news articles)
+**Data sources**: Binance API (OHLCV), CoinMarketCap API (market cap), CoinMetrics API (network activity & on-chain metrics), Blockchain.info API (mining metrics), Bitcoin Magazine (news articles)
 **Architecture**: Modular, config-driven design with organized data storage and robust web scraping capabilities
 
 ## Key Architecture
@@ -24,7 +24,7 @@ All settings are centralized in `config.py`:
 - **Configurable Time Collection**: Single END_TIME variable with hour-level precision support
 
 ### Data Collection Pipeline
-Eight main data collectors with no confirmation prompts (auto-start) plus unified dataset processing:
+Seven main data collectors with no confirmation prompts (auto-start) plus unified dataset processing:
 
 1. **OHLCV Collector** (`collectors/1_ohlcv-h4.py`):
    - Fetches H4 OHLCV data from Binance for BTC/ETH
@@ -46,25 +46,20 @@ Eight main data collectors with no confirmation prompts (auto-start) plus unifie
    - Collects Hash Rate, Mining Difficulty, and Miner Revenue
    - Saves to `data/raw/secureandmining/BTC_mining_d1.csv`
 
-5. **Profit and Value Collector** (`collectors/5_profitandvalue-d1.py`):
-   - Fetches daily profit and value metrics from CoinMetrics for BTC/ETH
-   - Collects MVRV Ratio, Exchange Inflows/Outflows, Exchange Supply (raw API data only)
-   - Saves to `data/raw/profitandvalue/{coin}_profitandvalue.csv`
-
-6. **Holder Behavior Collector** (`collectors/6_holderbehavior-d1.py`):
-   - Fetches daily holder behavior metrics from CoinMetrics for BTC (free tier limitations)
-   - Collects Total Supply, MVRV Ratio, Exchange Flows, Exchange Supply (raw API data only)
+5. **On-chain Metrics Collector** (`collectors/5_onchainmetrics-d1.py`):
+   - Fetches daily on-chain valuation and holder metrics from CoinMetrics for BTC/ETH
+   - Collects Total Supply (BTC only), MVRV Ratio, Exchange Flows/Supply (comprehensive free tier metrics)
    - Note: Advanced holder metrics (HODL Waves, Illiquid Supply, CDD, Whale Holdings) require paid APIs
-   - Saves to `data/raw/holderbehavior/{coin}_holderbehavior.csv`
+   - Saves to `data/raw/onchainmetrics/{coin}_onchainmetrics.csv`
 
-7. **Bitcoin Magazine News Scraper** (`collectors/7_bitcoinmagazinenews-all.py`):
+6. **Bitcoin Magazine News Scraper** (`collectors/6_bitcoinmagazinenews-all.py`):
    - Scrapes all Bitcoin Magazine articles with comprehensive error handling and resume functionality
    - Features: Serial ID tracking, progress bars with tqdm, automatic HTML file naming with article timestamps
    - Robots.txt compliance with bingbot user agent and 3-second delays
    - Saves to `data/raw/news/bitcoinmagazinenews.csv` and `data/raw/news/html/{ID}_{timestamp}.html`
    - **COMPLETED**: 13,391 total articles, 13,391 crawled (100% success), 0 failed, 0 pending
 
-8. **Sentiment Index Collector** (`collectors/8_sentimentindex-d1.py`):
+7. **Sentiment Index Collector** (`collectors/7_sentimentindex-d1.py`):
    - Fetches Fear & Greed Index data from Alternative.me free API
    - Collects daily sentiment values (0-100 scale) and classification labels
    - Coverage: 2018-present with complete historical data (2,867 daily records)
@@ -72,8 +67,8 @@ Eight main data collectors with no confirmation prompts (auto-start) plus unifie
    - **COMPLETED**: 2,867 daily records from 2018-02-01 to 2025-12-11
    - **Updated**: Fixed data preservation logic to maintain complete historical dataset during incremental updates
 
-9. **Master Dataset Processor** (`processors/cleaning.ipynb`):
-   - Unified processing pipeline that combines all 8 data sources into single H4-aligned dataset
+8. **Master Dataset Processor** (`processors/build_master.ipynb`):
+   - Unified processing pipeline that combines all 7 data sources into single H4-aligned dataset
    - Advanced sentiment analysis using CryptoBERT model with 11 distinct sentiment metrics
    - Column prefixing strategy (BTC_, ETH_) for clear data source identification
    - H4 time grid alignment with comprehensive validation and forward-fill for missing values
@@ -82,7 +77,7 @@ Eight main data collectors with no confirmation prompts (auto-start) plus unifie
    - Saves to `data/raw/master_dataset_h4_v1.csv` (84MB unified dataset)
    - **COMPLETED**: Full H4 coverage from 2009-01-03 to 2025-11-25 with comprehensive sentiment analysis
 
-10. **Data Cleaning and Processing** (`processors/cleaning.ipynb`):
+9. **Data Cleaning and Processing** (`processors/cleaning.ipynb`):
     - Additional data cleaning and processing pipeline for production-ready dataset
     - Processes raw master dataset into cleaned format optimized for ML pipelines
     - Data quality improvements and feature engineering
@@ -115,17 +110,13 @@ Eight main data collectors with no confirmation prompts (auto-start) plus unifie
 - Timestamp format: pandas datetime aligned to H4 grid (interpolated from daily data)
 - Features: Daily mining security metrics for blockchain analysis
 
-**Profit and Value Data Format** (`data/raw/profitandvalue/`):
-- Columns: `timestamp, mvrv_ratio, exchange_inflow_native, exchange_inflow_usd, exchange_outflow_native, exchange_outflow_usd, exchange_supply_native, exchange_supply_usd`
-- Master Dataset Format: `timestamp, BTC_mvrv_ratio, BTC_exchange_inflow_native, BTC_exchange_inflow_usd, BTC_exchange_outflow_native, BTC_exchange_outflow_usd, BTC_exchange_supply_native, BTC_exchange_supply_usd, ETH_*` equivalents
+**On-chain Metrics Data Format** (`data/raw/onchainmetrics/`):
+- **BTC Columns**: `timestamp, total_supply, mvrv_ratio, exchange_inflow_native, exchange_inflow_usd, exchange_outflow_native, exchange_outflow_usd, exchange_supply_native, exchange_supply_usd`
+- **ETH Columns**: `timestamp, mvrv_ratio, exchange_inflow_native, exchange_inflow_usd, exchange_outflow_native, exchange_outflow_usd, exchange_supply_native, exchange_supply_usd`
+- Master Dataset Format: `timestamp, BTC_total_supply, BTC_mvrv_ratio, BTC_*` equivalents for BTC; `ETH_mvrv_ratio, ETH_*` equivalents for ETH
 - Timestamp format: pandas datetime aligned to H4 grid (interpolated from daily data)
-- Features: Raw on-chain metrics from CoinMetrics API with prefixed column names (no calculated fields)
-
-**Holder Behavior Data Format** (`data/raw/holderbehavior/`):
-- Columns: `timestamp, total_supply, mvrv_ratio, exchange_inflow_native, exchange_inflow_usd, exchange_outflow_native, exchange_outflow_usd, exchange_supply_native, exchange_supply_usd`
-- Master Dataset Format: Same column names without prefix (BTC-specific metrics only, following legacy naming)
-- Timestamp format: pandas datetime aligned to H4 grid (interpolated from daily data)
-- Features: Raw BTC holder behavior metrics from CoinMetrics API (no calculated fields)
+- Features: Comprehensive on-chain valuation and holder metrics from CoinMetrics API with prefixed column names (no calculated fields)
+- Note: Total Supply only available for BTC due to API limitations
 
 **Bitcoin Magazine News Data Format** (`data/raw/news/`):
 - **Base CSV Format**: `bitcoinmagazinenews_crawl.csv` with `id, datetime, url, status` (13,391 articles)
@@ -163,8 +154,7 @@ Eight main data collectors with no confirmation prompts (auto-start) plus unifie
 - **Market Cap Data (4 columns)**: `BTC_market_cap`, `ETH_market_cap`, `USDT_market_cap`, `USDC_market_cap`
 - **Network Activity Data (4 columns)**: `BTC_active_addresses`, `BTC_tx_count`, `ETH_active_addresses`, `ETH_tx_count`
 - **Mining Metrics (3 columns)**: `mining_difficulty`, `hash_rate_ths`, `miner_revenue_usd`
-- **Profit and Value Data (14 columns)**: `BTC_mvrv_ratio`, `BTC_exchange_inflow_native`, `BTC_exchange_inflow_usd`, `BTC_exchange_outflow_native`, `BTC_exchange_outflow_usd`, `BTC_exchange_supply_native`, `BTC_exchange_supply_usd`, `ETH_*` equivalents
-- **Holder Behavior Data (8 columns)**: `total_supply`, `mvrv_ratio`, `exchange_inflow_native`, `exchange_inflow_usd`, `exchange_outflow_native`, `exchange_outflow_usd`, `exchange_supply_native`, `exchange_supply_usd`
+- **On-chain Metrics Data (15 columns)**: `BTC_total_supply`, `BTC_mvrv_ratio`, `BTC_exchange_*` (7 columns), `ETH_mvrv_ratio`, `ETH_exchange_*` (7 columns)
 - **Sentiment Index Data (2 columns)**: `value`, `classification` (Fear & Greed Index)
 - **News Processing Data (12 columns)**: `merged_content`, `news_article_count`, `news_log_article_count`, `has_news`, `news_head_sent_net_mean`, `news_global_sent_net_mean`, `news_head_sent_net_max`, `news_head_sent_net_min`, `news_head_sent_net_std`, `news_max_bull_prob`, `news_max_bear_prob`, `original_ids`
 - **Column Naming**: All data source columns use prefixes (BTC_, ETH_) to prevent conflicts and enable clear source identification
@@ -193,20 +183,17 @@ python collectors/3_networkactivity-d1.py
 # Collect security and mining data
 python collectors/4_secureandmining-d1.py
 
-# Collect profit and value data
-python collectors/5_profitandvalue-d1.py
-
-# Collect holder behavior data (BTC only - free tier)
-python collectors/6_holderbehavior-d1.py
+# Collect on-chain metrics data (BTC + ETH)
+python collectors/5_onchainmetrics-d1.py
 
 # Scrape Bitcoin Magazine news (completed - 13,391 articles)
-python collectors/7_bitcoinmagazinenews-all.py
+python collectors/6_bitcoinmagazinenews-all.py
 
 # Collect sentiment index data (Fear & Greed)
-python collectors/8_sentimentindex-d1.py
+python collectors/7_sentimentindex-d1.py
 
 # Process master dataset (unified H4-aligned dataset with sentiment analysis)
-jupyter lab processors/cleaning.ipynb
+jupyter lab processors/build_master.ipynb
 
 # Process cleaned dataset (additional cleaning and ML-ready processing)
 jupyter lab processors/cleaning.ipynb
@@ -215,7 +202,7 @@ jupyter lab processors/cleaning.ipynb
 ### Data Processing Commands
 ```bash
 # Run the complete master dataset building pipeline
-jupyter lab processors/cleaning.ipynb
+jupyter lab processors/build_master.ipynb
 # Follow the notebook cells sequentially for:
 # - Data loading and validation
 # - H4 grid alignment and interpolation
@@ -261,8 +248,7 @@ ls -la data/raw/ohlcv/
 ls -la data/raw/marketcap/
 ls -la data/raw/networkactivity/
 ls -la data/raw/secureandmining/
-ls -la data/raw/profitandvalue/
-ls -la data/raw/holderbehavior/
+ls -la data/raw/onchainmetrics/
 ls -la data/raw/news/
 ls -la data/raw/sentimentindex/
 ls -la data/processed/
@@ -272,8 +258,7 @@ head data/raw/ohlcv/BTC_h4_ohlcv.csv
 head data/raw/marketcap/market_cap_h4.csv
 head data/raw/networkactivity/BTC_networkactivity.csv
 head data/raw/secureandmining/BTC_mining_d1.csv
-head data/raw/profitandvalue/BTC_profitandvalue.csv
-head data/raw/holderbehavior/BTC_holderbehavior.csv
+head data/raw/onchainmetrics/BTC_onchainmetrics.csv
 head data/raw/news/bitcoinmagazinenews.csv
 head data/raw/sentimentindex/fear_greed_index_d1.csv
 
@@ -337,6 +322,7 @@ The system uses `utils/time_utils.py` for intelligent time range calculation:
 - Default timeframe: 4-hour (H4) intervals for OHLCV and market cap data
 - Network activity: Daily (D1) intervals
 - Mining metrics: Daily (D1) intervals
+- On-chain metrics: Daily (D1) intervals
 - Historical coverage: From earliest available timestamp to present
 - Data processing: Automatic duplicate removal and forward-filling
 
@@ -345,8 +331,7 @@ The system uses `utils/time_utils.py` for intelligent time range calculation:
 - **Market Cap**: BTC (ID: 1), ETH (ID: 1027), USDT (ID: 825), USDC (ID: 3408)
 - **Network Activity**: BTC, ETH (CoinMetrics metrics: Active Addresses, Transaction Count)
 - **Mining Metrics**: BTC (Blockchain.info metrics: Hash Rate, Difficulty, Miner Revenue)
-- **Profit and Value**: BTC, ETH (CoinMetrics metrics: MVRV, Exchange Flows, Exchange Supply)
-- **Holder Behavior**: BTC only (CoinMetrics metrics: Total Supply, MVRV, Exchange Flows, Exchange Supply)
+- **On-chain Metrics**: BTC (Total Supply + MVRV + Exchange metrics), ETH (MVRV + Exchange metrics)
 
 ## Data Collection Philosophy
 
@@ -358,10 +343,10 @@ This system follows a strict "collect-only" philosophy:
 - **Processing Stage Separation**: All calculations (net flows, percentages, log returns) are moved to data processing stage
 
 ### Data Source Authenticity
-All 8 collectors use authoritative, legitimate sources:
+All 7 collectors use authoritative, legitimate sources:
 - **Binance API**: Real exchange OHLCV data
 - **CoinMarketCap API**: Real cryptocurrency market cap data
-- **CoinMetrics API**: Real blockchain on-chain metrics
+- **CoinMetrics API**: Real blockchain on-chain metrics (network activity + valuation)
 - **Blockchain.info API**: Real Bitcoin mining statistics
 - **Alternative.me API**: Real market sentiment data
 - **Bitcoin Magazine**: Direct web scraping of real news content
@@ -400,7 +385,7 @@ All 8 collectors use authoritative, legitimate sources:
 
 ### Data Processing Pipeline
 
-The `processors/cleaning.ipynb` provides comprehensive data processing capabilities:
+The `processors/build_master.ipynb` provides comprehensive data processing capabilities:
 
 #### HTML Content Extraction
 - **Article Parser**: Extracts structured content from Bitcoin Magazine HTML files
@@ -458,9 +443,8 @@ The `processors/cleaning.ipynb` provides comprehensive data processing capabilit
 - BTC Daily Network Activity: ~6.2K records (256KB)
 - ETH Daily Network Activity: ~3.8K records (162KB)
 - BTC Daily Mining Metrics: ~365 records (latest year)
-- BTC Daily Profit and Value: ~6.2K records (1.1MB)
-- ETH Daily Profit and Value: ~3.8K records (0.8MB)
-- BTC Daily Holder Behavior: ~6.2K records (1.2MB)
+- BTC Daily On-chain Metrics: ~6.2K records (868KB) - comprehensive with Total Supply
+- ETH Daily On-chain Metrics: ~3.8K records (688KB) - valuation and exchange metrics
 - Bitcoin Magazine News Base: 13,391 articles (4-column crawl format, CSV + HTML files)
 - Bitcoin Magazine News Enhanced: 13,391 articles with comprehensive sentiment analysis (22 columns, 2.7MB)
   - **11 Sentiment Metrics**: Head, global, maximum, and top-K sentiment probabilities per article
@@ -522,14 +506,21 @@ Mining metrics data complements price and market data by:
 - Supporting machine learning models with network security metrics
 - Offering insights into mining network health and profitability trends
 
-## Profit and Value Metrics
+## On-chain Metrics
 
 ### Available Metrics
-The profit and value collector provides the following valuation and flow metrics:
+The on-chain metrics collector provides the following comprehensive valuation and holder metrics:
+
+**BTC (8 metrics):**
+- **Total Supply (SplyCur)**: Complete circulating supply of Bitcoin
 - **MVRV Ratio (CapMVRVCur)**: Market Value to Realized Value ratio
 - **Exchange Inflows/Outflows**: Native units and USD value flowing to/from exchanges
 - **Exchange Supply**: Total supply held on exchanges
-- **Note**: Net flows and realized price are calculated during data processing, not collection
+
+**ETH (7 metrics):**
+- **MVRV Ratio (CapMVRVCur)**: Market Value to Realized Value ratio
+- **Exchange Inflows/Outflows**: Native units and USD value flowing to/from exchanges
+- **Exchange Supply**: Total supply held on exchanges
 
 ### Data Sources
 - **CoinMetrics Community API**: Free tier with comprehensive on-chain valuation metrics
@@ -542,42 +533,16 @@ The profit and value collector provides the following valuation and flow metrics
 - **Automatic updates**: Extends to most recent available data
 
 ### Integration Benefits
-Profit and value data complements price and market data by:
-- Providing valuation metrics (MVRV) for market cycle analysis
-- Enabling analysis of exchange flow patterns and supply dynamics
-- Supporting machine learning models with on-chain valuation indicators
-
-## Holder Behavior Metrics
-
-### Available Metrics
-The holder behavior collector provides the following BTC holder metrics (free tier):
-- **Total Supply (SplyCur)**: Complete circulating supply of Bitcoin
-- **MVRV Ratio (CapMVRVCur)**: Market Value to Realized Value ratio
-- **Exchange Inflows/Outflows**: Native units and USD value flowing to/from exchanges
-- **Exchange Supply**: Total supply held on exchanges
-- **Note**: Net flows and exchange supply percentage are calculated during data processing, not collection
-
-### Data Sources
-- **CoinMetrics Community API**: Free tier with limited holder behavior metrics
-- **No API key required**: Public access to historical holder data
-- **Rate limited**: 10 requests per 6 seconds to ensure fair usage
-
-### Historical Coverage
-- **Bitcoin**: From 2009-01-03 to present (daily data)
-- **Automatic updates**: Extends to most recent available data
-- **Chunk-based collection**: 365-day chunks for efficient data retrieval
+On-chain metrics data complements price and market data by:
+- **Valuation Analysis**: MVRV ratio for market cycle identification
+- **Supply Dynamics**: Exchange flow patterns and supply distribution analysis
+- **Holder Behavior**: Exchange positioning and accumulation/distribution patterns
+- **Market Psychology**: Supply-side indicators complementing price action
 
 ### Limitations
 - **Free tier only**: Advanced holder metrics require paid subscriptions
 - **Missing metrics**: HODL Waves, Illiquid Supply, Coin Days Destroyed, Whale Holdings
 - **Premium sources**: Glassnode, CryptoQuant, Kaiko offer comprehensive holder analytics
-
-### Integration Benefits
-Holder behavior data complements price and market data by:
-- Providing exchange flow patterns for accumulation/distribution analysis
-- Enabling MVRV-based market cycle identification
-- Supporting machine learning models with holder positioning indicators
-- Offering insights into long-term vs short-term holder behavior
 
 ## Sentiment Index Metrics
 
@@ -657,7 +622,7 @@ The master dataset processor includes advanced sentiment analysis using cryptocu
 The master dataset processor implements a comprehensive data unification pipeline:
 
 #### **Phase 1: Data Ingestion and Validation**
-1. **Multi-source Loading**: Concurrent loading of all 8 raw data sources
+1. **Multi-source Loading**: Concurrent loading of all 7 raw data sources
 2. **Schema Validation**: Automatic column type checking and format standardization
 3. **Timestamp Normalization**: ISO 8601 parsing with microsecond cleanup and UTC conversion
 4. **Quality Checks**: Duplicate detection, missing value analysis, and data integrity validation
@@ -730,7 +695,7 @@ When adding new data sources to the master dataset:
 
 ### Master Dataset Integration
 When extending the master dataset with new data sources:
-1. **Raw Data Collection**: Add new collector following existing 8-collector pattern
+1. **Raw Data Collection**: Add new collector following existing 7-collector pattern
 2. **Column Prefixing**: Apply systematic naming with cryptocurrency prefixes
 3. **H4 Alignment**: Implement time grid alignment and interpolation as needed
 4. **Validation**: Add data quality checks and validation in processing pipeline

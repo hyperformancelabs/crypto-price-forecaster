@@ -15,8 +15,7 @@ OHLCV_DIR = f"{RAW_DIR}/ohlcv"
 MARKETCAP_DIR = f"{RAW_DIR}/marketcap"
 NETWORKACTIVITY_DIR = f"{RAW_DIR}/networkactivity"
 SECUREANDMINING_DIR = f"{RAW_DIR}/secureandmining"
-PROFITANDVALUE_DIR = f"{RAW_DIR}/profitandvalue"
-HOLDERBEHAVIOR_DIR = f"{RAW_DIR}/holderbehavior"
+ONCHAINMETRICS_DIR = f"{RAW_DIR}/onchainmetrics"
 SENTIMENTINDEX_DIR = f"{RAW_DIR}/sentimentindex"
 NEWS_DIR = f"{RAW_DIR}/news"
 
@@ -49,15 +48,10 @@ MINING_METRICS = {
     'miners-revenue': {'name': 'Miners Revenue', 'unit': 'USD', 'description': 'Total mining revenue in USD'}
 }
 
-# Profit and value metrics configuration (available on CoinMetrics free tier)
-PROFITANDVALUE_METRICS = {
-    'BTC': ['CapMVRVCur', 'FlowInExNtv', 'FlowInExUSD', 'FlowOutExNtv', 'FlowOutExUSD', 'SplyExNtv', 'SplyExUSD'],
+# On-chain metrics configuration (comprehensive free tier metrics)
+ONCHAINMETRICS_METRICS = {
+    'BTC': ['SplyCur', 'CapMVRVCur', 'FlowInExNtv', 'FlowInExUSD', 'FlowOutExNtv', 'FlowOutExUSD', 'SplyExNtv', 'SplyExUSD'],
     'ETH': ['CapMVRVCur', 'FlowInExNtv', 'FlowInExUSD', 'FlowOutExNtv', 'FlowOutExUSD', 'SplyExNtv', 'SplyExUSD']
-}
-
-# Holder behavior metrics configuration (BTC only - free tier limitations)
-HOLDERBEHAVIOR_METRICS = {
-    'BTC': ['SplyCur', 'CapMVRVCur', 'FlowInExNtv', 'FlowInExUSD', 'FlowOutExNtv', 'FlowOutExUSD', 'SplyExNtv', 'SplyExUSD']
 }
 
 # API parameters
@@ -78,13 +72,9 @@ MINING_CHUNK_DAYS = 365
 SECUREANDMINING_RATE_LIMIT = 1  # Blockchain.info: 1 request per second
 SECUREANDMINING_CHUNK_DAYS = 365
 
-# Profit and value API parameters
-PROFITANDVALUE_RATE_LIMIT = 6  # CoinMetrics: 10 requests per 6 seconds
-PROFITANDVALUE_CHUNK_DAYS = 365
-
-# Holder behavior API parameters
-HOLDERBEHAVIOR_RATE_LIMIT = 6  # CoinMetrics: 10 requests per 6 seconds
-HOLDERBEHAVIOR_CHUNK_DAYS = 365
+# On-chain metrics API parameters
+ONCHAINMETRICS_RATE_LIMIT = 6  # CoinMetrics: 10 requests per 6 seconds
+ONCHAINMETRICS_CHUNK_DAYS = 365
 
 # Sentiment Index API parameters
 SENTIMENTINDEX_RATE_LIMIT = 3600  # Alternative.me: 1 request per hour (respectful limit)
@@ -126,7 +116,7 @@ DEFAULT_START_DATES = {
 def ensure_directories():
     """Create necessary directories if they don't exist"""
     directories = [
-        DATA_DIR, RAW_DIR, PROCESSED_DIR, OHLCV_DIR, MARKETCAP_DIR, NETWORKACTIVITY_DIR, SECUREANDMINING_DIR, PROFITANDVALUE_DIR, HOLDERBEHAVIOR_DIR, SENTIMENTINDEX_DIR, NEWS_DIR, f"{NEWS_DIR}/html"
+        DATA_DIR, RAW_DIR, PROCESSED_DIR, OHLCV_DIR, MARKETCAP_DIR, NETWORKACTIVITY_DIR, SECUREANDMINING_DIR, ONCHAINMETRICS_DIR, SENTIMENTINDEX_DIR, NEWS_DIR, f"{NEWS_DIR}/html"
     ]
     for directory in directories:
         if not os.path.exists(directory):
@@ -149,13 +139,9 @@ def get_mining_file() -> str:
     """Get mining metrics file path (raw data)"""
     return f"{SECUREANDMINING_DIR}/BTC_mining_d1.csv"
 
-def get_profitandvalue_file(coin: str) -> str:
-    """Get profit and value file path for a coin (raw data)"""
-    return f"{PROFITANDVALUE_DIR}/{coin}_profitandvalue.csv"
-
-def get_holderbehavior_file(coin: str) -> str:
-    """Get holder behavior file path for a coin (raw data)"""
-    return f"{HOLDERBEHAVIOR_DIR}/{coin}_holderbehavior.csv"
+def get_onchainmetrics_file(coin: str) -> str:
+    """Get on-chain metrics file path for a coin (raw data)"""
+    return f"{ONCHAINMETRICS_DIR}/{coin}_onchainmetrics.csv"
 
 def get_sentimentindex_file() -> str:
     """Get sentiment index file path (raw data)"""
