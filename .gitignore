@@ -112,15 +112,10 @@ cython_debug/
 
 .pypirc
 
-.cursorignore
-.cursorindexingignore
-
 marimo/_static/
 marimo/_lsp/
 __marimo__/
 
 data/raw/news/html/*.html
-.claude/
-.mcp.json
 
 *.DS_Store
