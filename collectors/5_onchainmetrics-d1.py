@@ -1,3 +1,4 @@
+#!/usr/bin/env python
 """
 On-chain Metrics Daily Data Collector from CoinMetrics
 Fetches historical on-chain valuation and holder metrics for BTC and ETH with daily interval

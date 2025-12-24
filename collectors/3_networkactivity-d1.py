@@ -1,3 +1,4 @@
+#!/usr/bin/env python
 """
 Network Activity Daily Data Collector from CoinMetrics
 Fetches historical network activity metrics for BTC and ETH with daily interval
