@@ -1,24 +1,22 @@
+#!/usr/bin/env python
 """
 Crypto Data Collector - OHLCV Data from Binance
 Fetches H4 OHLCV data for BTC and ETH
 """
 
-import sys
 import os
+import sys
+from pathlib import Path
 import time
-sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+import requests
+import pandas as pd
 
+sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from config import (
     COINS, BINANCE_BASE_URL, ensure_directories, get_ohlcv_file,
     END_TIME
 )
-
-import requests
-import pandas as pd
-import numpy as np
 from utils.time_utils import calculate_collection_range, format_time_range_for_display, merge_dataframes, truncate_dataset_to_end_time
-import os
-
 
 class BinanceFetcher:
     def __init__(self):
@@ -37,8 +35,8 @@ class BinanceFetcher:
             data = response.json()
             if data and len(data) > 0:
                 return data[0][0]
-        except:
-            pass
+        except Exception as e:
+            print(f"Error fetching earliest timestamp for {symbol}: {e}")
         return None
 
     def fetch_h4_ohlcv(self, symbol, start_time_ms=None, end_time_ms=None):
@@ -162,11 +160,7 @@ class CryptoDataCollector:
                 if os.path.exists(file_path):
                     try:
                         existing_df = pd.read_csv(file_path)
-                        existing_df['timestamp'] = pd.to_datetime(existing_df['timestamp'])
-                        # Make existing data timezone-aware for consistency
-                        import pytz
-                        if existing_df['timestamp'].dt.tz is None:
-                            existing_df['timestamp'] = existing_df['timestamp'].dt.tz_localize('UTC')
+                        existing_df["timestamp"] = pd.to_datetime(existing_df["timestamp"], utc=True)
                         df = merge_dataframes(existing_df, df)
                         print(f"Merged with existing data. Total records: {len(df)}")
                     except Exception as e:
@@ -187,11 +181,7 @@ class CryptoDataCollector:
                 if os.path.exists(file_path):
                     try:
                         existing_df = pd.read_csv(file_path)
-                        existing_df['timestamp'] = pd.to_datetime(existing_df['timestamp'])
-                        # Make existing data timezone-aware for consistency
-                        import pytz
-                        if existing_df['timestamp'].dt.tz is None:
-                            existing_df['timestamp'] = existing_df['timestamp'].dt.tz_localize('UTC')
+                        existing_df["timestamp"] = pd.to_datetime(existing_df["timestamp"], utc=True)
 
                         # Apply truncation to existing data
                         df_truncated = truncate_dataset_to_end_time(existing_df, self.end_time_config)
@@ -215,7 +205,6 @@ class CryptoDataCollector:
         print("SUMMARY")
         print("=" * 50)
 
-        from pathlib import Path
         h4_files = list(Path("data/raw/ohlcv").glob("*.csv"))
 
         print(f"OHLCV files: {len(h4_files)}")

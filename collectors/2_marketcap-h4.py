@@ -1,3 +1,4 @@
+#!/usr/bin/env python
 """
 Market Cap H4 Data Collector from CoinMarketCap
 Fetches historical market cap data for BTC, ETH, USDT, USDC with H4 interval

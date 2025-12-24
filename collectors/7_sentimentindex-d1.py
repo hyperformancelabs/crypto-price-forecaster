@@ -1,3 +1,4 @@
+#!/usr/bin/env python
 """
 Sentiment Index Daily Data Collector from Alternative.me
 Fetches historical Fear & Greed Index data with daily interval

@@ -7,7 +7,7 @@ import pandas as pd
 from datetime import datetime, timedelta
 from typing import Optional, Tuple
 import os
-
+import pytz
 
 def parse_end_time(end_time_config: str) -> datetime:
     """
@@ -22,7 +22,6 @@ def parse_end_time(end_time_config: str) -> datetime:
     Raises:
         ValueError: If the format is invalid
     """
-    import pytz
 
     if end_time_config.lower() == 'now':
         return datetime.now(pytz.UTC)
@@ -47,7 +46,7 @@ def parse_end_time(end_time_config: str) -> datetime:
             except ValueError:
                 continue
 
-        raise ValueError(f"Invalid END_TIME format: {end_time_config}. Use 'now', 'YYYY-MM-DD', or 'YYYY-MM-DD HH:MM'")
+        raise ValueError(f"Invalid END_TIME format: {end_time_config}. Use 'now', 'YYYY-MM-DD', 'YYYY-MM-DD HH', or 'YYYY-MM-DD HH:MM'")
 
 
 def get_default_start_date(data_type: str, coin: Optional[str] = None) -> datetime:
@@ -61,7 +60,6 @@ def get_default_start_date(data_type: str, coin: Optional[str] = None) -> dateti
     Returns:
         datetime: Default start date for the data type/coin (timezone-aware)
     """
-    import pytz
 
     try:
         from config import DEFAULT_START_DATES
@@ -87,7 +85,6 @@ def get_existing_data_range(file_path: str, timestamp_column: str = 'timestamp')
     Returns:
         Tuple of (min_timestamp, max_timestamp) or (None, None) if file doesn't exist/can't be read
     """
-    import pytz
 
     if not os.path.exists(file_path):
         return None, None
@@ -152,7 +149,6 @@ def calculate_collection_range(end_time_config: str,
     if start_time > end_time:
         print(f"Warning: Start time {start_time} is after end time {end_time}")
         # Make fallback also timezone-aware
-        import pytz
         fallback_start = end_time - timedelta(days=1)
         if fallback_start.tzinfo is None:
             fallback_start = pytz.UTC.localize(fallback_start)
@@ -259,13 +255,7 @@ def truncate_dataset_to_end_time(df: pd.DataFrame, end_time_config: str,
 
     end_time = parse_end_time(end_time_config)
 
-    # Ensure timestamp column is datetime and timezone-aware
-    df[timestamp_column] = pd.to_datetime(df[timestamp_column])
-
-    # Make timestamp column timezone-aware if it isn't already
-    import pytz
-    if df[timestamp_column].dt.tz is None:
-        df[timestamp_column] = df[timestamp_column].dt.tz_localize('UTC')
+    df[timestamp_column] = pd.to_datetime(df[timestamp_column], utc=True, errors="coerce")
 
     # Count records before truncation for reporting
     original_count = len(df)

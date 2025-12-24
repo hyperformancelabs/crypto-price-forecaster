@@ -1,3 +1,4 @@
+#!/usr/bin/env python
 """
 Security and Mining Metrics Daily Data Collector from Blockchain.info
 Fetches historical security and mining metrics for BTC with daily interval

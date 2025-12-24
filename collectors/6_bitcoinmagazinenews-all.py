@@ -1,4 +1,4 @@
-#!/usr/bin/env python3
+#!/usr/bin/env python
 """
 Bitcoin Magazine News Scraper
 
@@ -197,9 +197,6 @@ def parse_post_sitemap(sitemap_url):
         root = ET.fromstring(response.content)
         namespace = {'ns': 'http://www.sitemaps.org/schemas/sitemap/0.9'}
 
-        # Check if this is a news sitemap with publication dates
-        news_namespace = {'news': 'http://www.google.com/schemas/sitemap-news/0.9'}
-
         for url in root.findall('.//ns:url', namespace):
             loc = url.find('ns:loc', namespace)
             lastmod = url.find('ns:lastmod', namespace)
@@ -269,8 +266,9 @@ def scrape_article(url, article_id, article_datetime):
             # Parse ISO datetime and convert to clean format
             dt = datetime.fromisoformat(article_datetime.replace('Z', '+00:00'))
             timestamp = dt.strftime('%Y%m%d_%H%M%S')
-        except:
+        except Exception as e:
             # Fallback to current time if datetime parsing fails
+            print(f"Error parsing datetime for {url}: {e}")
             timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
 
         html_filename = f"{article_id:06d}_{timestamp}.html"
