@@ -62,23 +62,23 @@ jupyter notebook infer/train.ipynb
 
 ## Key Features
 
-**Price & Returns**: Log returns, volatility
-**Volume**: Relative volume, momentum
-**Technical**: Bollinger Bands, CLV, wick imbalance
-**Market Structure**: Correlations, market cap ratios
-**Network**: Active addresses, transaction intensity
-**Mining**: Hash ribbon, Puell multiple
-**On-chain**: MVRV, exchange flows, reserves
-**News Sentiment**: Article count, sentiment scores, decay
-**Market Sentiment**: Fear & Greed Index changes
+- **Price & Returns**: Log returns, volatility
+- **Volume**: Relative volume, momentum
+- **Technical**: Bollinger Bands, CLV, wick imbalance
+- **Market Structure**: Correlations, market cap ratios
+- **Network**: Active addresses, transaction intensity
+- **Mining**: Hash ribbon, Puell multiple
+- **On-chain**: MVRV, exchange flows, reserves
+- **News Sentiment**: Article count, sentiment scores, decay
+- **Market Sentiment**: Fear & Greed Index changes
 
 **Target**: BTC next-period log return (1-period horizon, 6-period window)
 
 ## Models
 
-**Linear**: Ridge, Lasso, ElasticNet, Huber, SGD
-**Non-linear**: LinearSVR, SVR-RBF, Decision Tree
-**Ensemble**: Random Forest, Gradient Boosting
+- **Linear**: Ridge, Lasso, ElasticNet, Huber, SGD
+- **Non-linear**: LinearSVR, SVR-RBF, Decision Tree
+- **Ensemble**: Random Forest, Gradient Boosting
 
 **Metrics**: RMSE, MAE, IC, Directional Accuracy, PnL, Win Rate, Max Drawdown
 
@@ -102,9 +102,9 @@ Detailed guides in [`docs/`](docs/):
 
 ## Data Files
 
-**Raw** (`data/raw/`): Per-source collected data
-**Processed** (`data/processed/`): Merged, cleaned, feature-engineered
-**Artifacts** (`artifacts/`): Trained models and scalers
+- **Raw** (`data/raw/`): Per-source collected data
+- **Processed** (`data/processed/`): Merged, cleaned, feature-engineered
+- **Artifacts** (`artifacts/`): Trained models and scalers
 
 ## License
 
