@@ -6,6 +6,8 @@ Machine learning pipeline for cryptocurrency price prediction using multi-source
 
 Production-ready data pipeline for BTC/ETH price forecasting with 7 data sources, 30+ engineered features, and multiple ML algorithms.
 
+> 📄 **[Technical Report (PDF)](docs/technical_report.pdf)** — Full methodology, analysis, and results.
+
 ## Project Structure
 
 ```
